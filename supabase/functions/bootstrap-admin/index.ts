@@ -53,6 +53,16 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    const { data: tokenValid, error: tokenCheckError } = await admin.rpc(
+      "fn_is_auth_bootstrap_token_valid",
+      { p_token_hash: tokenHash }
+    );
+    if (tokenCheckError || tokenValid !== true) {
+      return jsonResponse(403, {
+        error: "کد راه‌اندازی نامعتبر، مصرف‌شده یا منقضی است.",
+      });
+    }
+
     const email = `${username}@farzam.local`;
     const { data, error } = await admin.auth.admin.createUser({
       email,
