@@ -184,7 +184,7 @@ export const supabaseGateway = {
         fixedAssets: (faRes.data ?? []) as FixedAsset[],
         agentApprovals: (aprRes.data ?? []) as AgentApprovalRequest[],
         tafsilParties: (tafRes.data ?? []) as TafsilParty[],
-        products: (prdRes.data ?? []) as Product[],
+        products: (prdRes.data ?? []) as unknown as Product[],
       };
     } catch {
       return null;
