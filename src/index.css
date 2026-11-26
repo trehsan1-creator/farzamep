@@ -78,6 +78,8 @@ body {
 .kpi-value { display:block; margin:1.15rem 0 .35rem; color:#f8fafc; font-size:clamp(1.2rem,2vw,1.8rem); letter-spacing:-.04em; }
 .kpi-card small { color:#8fa6bb; font-size:.72rem; }
 .dashboard-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:1rem; margin-top:1rem; }
+.data-trust-banner { display:flex; align-items:center; gap:.8rem; margin-top:1rem; padding:.9rem 1rem; border:1px solid rgba(255,154,61,.25); border-radius:.9rem; background:rgba(255,122,0,.08); color:#ffb16c; }
+.data-trust-banner > div { flex:1; min-width:0; } .data-trust-banner strong,.data-trust-banner span { display:block; } .data-trust-banner strong { color:#ffd2a7; font-size:.8rem; } .data-trust-banner span { margin-top:.2rem; color:#b4c2d1; font-size:.72rem; line-height:1.7; } .data-trust-banner button { display:inline-flex; align-items:center; gap:.35rem; white-space:nowrap; color:#ffc28d; font-size:.72rem; font-weight:700; }
 .panel-card { border:1px solid rgba(255,255,255,.09); border-radius:1rem; background:rgba(21,43,86,.65); padding:1.35rem; }
 .card-heading,.section-title { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
 .card-heading h2,.section-title h2 { margin:.35rem 0 0; color:#f8fafc; font-size:1.08rem; font-weight:800; }
