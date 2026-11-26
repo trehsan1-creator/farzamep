@@ -58,6 +58,47 @@ body {
   overflow-x: hidden;
 }
 
+/* Executive dashboard layer: sparse, decision-first, and deliberately quieter than the data modules. */
+.dashboard-page { max-width: 1440px; margin: 0 auto; padding: 2rem clamp(1rem, 3vw, 3rem) 3rem; }
+.dashboard-hero { display:flex; align-items:flex-end; justify-content:space-between; gap:1.5rem; padding:1.25rem 0 2rem; }
+.dashboard-hero h1 { margin:.7rem 0 .4rem; font-size:clamp(1.8rem, 3.2vw, 3rem); line-height:1.15; letter-spacing:-.04em; font-weight:800; }
+.dashboard-hero h1 span { color:var(--af-accent); }
+.dashboard-hero p { margin:0; color:#9eb0c2; font-size:.9rem; }
+.eyebrow,.card-kicker { display:flex; align-items:center; gap:.45rem; color:#8fa6bb; font-size:.68rem; font-weight:800; letter-spacing:.13em; }
+.live-dot { width:.42rem; height:.42rem; border-radius:50%; background:var(--af-success); box-shadow:0 0 0 4px rgba(16,185,129,.12); }
+.hero-action { display:inline-flex; align-items:center; gap:.55rem; border:1px solid rgba(255,122,0,.35); border-radius:.8rem; background:rgba(255,122,0,.12); color:#ffc28d; padding:.75rem 1rem; font-weight:700; font-size:.8rem; transition:.2s; }
+.hero-action:hover { background:var(--af-accent); color:#102333; }
+.kpi-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+.kpi-card { position:relative; overflow:hidden; min-height:150px; padding:1.2rem; border:1px solid rgba(255,255,255,.09); border-radius:1rem; background:linear-gradient(145deg,rgba(30,58,114,.92),rgba(21,43,86,.72)); box-shadow:0 14px 30px rgba(0,0,0,.12); }
+.kpi-card::after { content:''; position:absolute; left:-20px; bottom:-35px; width:120px; height:120px; border-radius:50%; background:currentColor; opacity:.06; }
+.kpi-card.teal { color:#34d399; } .kpi-card.orange { color:#ff9a3d; } .kpi-card.red { color:#fb7185; } .kpi-card.blue { color:#7dd3fc; }
+.kpi-top { display:flex; align-items:center; justify-content:space-between; color:#a8b8cc; font-size:.78rem; }
+.kpi-icon { display:grid; place-items:center; width:2rem; height:2rem; border-radius:.65rem; background:currentColor; color:var(--af-surface-deep); }
+.kpi-icon svg { width:1rem; height:1rem; }
+.kpi-value { display:block; margin:1.15rem 0 .35rem; color:#f8fafc; font-size:clamp(1.2rem,2vw,1.8rem); letter-spacing:-.04em; }
+.kpi-card small { color:#8fa6bb; font-size:.72rem; }
+.dashboard-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:1rem; margin-top:1rem; }
+.panel-card { border:1px solid rgba(255,255,255,.09); border-radius:1rem; background:rgba(21,43,86,.65); padding:1.35rem; }
+.card-heading,.section-title { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+.card-heading h2,.section-title h2 { margin:.35rem 0 0; color:#f8fafc; font-size:1.08rem; font-weight:800; }
+.card-icon { width:1.45rem; height:1.45rem; color:#34d399; } .card-icon.orange { color:var(--af-accent); }
+.cash-total { display:flex; align-items:baseline; gap:.55rem; margin:2rem 0 1.4rem; } .cash-total span { color:#9eb0c2; font-size:.8rem; } .cash-total strong { color:#f8fafc; font-size:1.6rem; } .cash-total small { color:#8fa6bb; }
+.flow-bars { display:grid; gap:1rem; } .flow-row > div:first-child { display:flex; justify-content:space-between; color:#a8b8cc; font-size:.76rem; margin-bottom:.45rem; } .flow-row b { color:#f8fafc; font-size:.78rem; }
+.flow-track { height:.45rem; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.08); } .flow-track span { display:block; height:100%; border-radius:99px; } .flow-track .green { background:#34d399; } .flow-track .orange { background:var(--af-accent); }
+.text-action { display:inline-flex; align-items:center; gap:.45rem; margin-top:1.5rem; color:#ffb16c; font-size:.76rem; font-weight:700; } .text-action:hover { color:#fff; }
+.focus-card { display:flex; flex-direction:column; gap:.75rem; } .focus-row { display:flex; align-items:center; gap:.7rem; padding:.75rem 0; border-bottom:1px solid rgba(255,255,255,.07); } .focus-row:last-child { border-bottom:0; }
+.focus-icon { display:grid; place-items:center; width:2.1rem; height:2.1rem; border-radius:.7rem; } .focus-icon svg { width:1rem; } .focus-icon.ok { background:rgba(16,185,129,.14); color:#34d399; } .focus-icon.warning { background:rgba(255,122,0,.14); color:#ff9a3d; }
+.focus-row div { flex:1; min-width:0; } .focus-row strong,.focus-row small { display:block; } .focus-row strong { color:#f8fafc; font-size:.8rem; } .focus-row small { margin-top:.2rem; color:#8fa6bb; font-size:.7rem; }
+.focus-row button { display:inline-flex; align-items:center; gap:.3rem; color:#a8b8cc; font-size:.68rem; white-space:nowrap; } .focus-row button:hover { color:#ffb16c; }
+.quick-section { margin-top:1.7rem; } .section-title { align-items:end; margin-bottom:.8rem; } .muted { color:#8095aa; font-size:.72rem; }
+.quick-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.75rem; } .quick-card { display:flex; align-items:center; gap:.7rem; min-height:4.2rem; padding:.85rem 1rem; border:1px solid rgba(255,255,255,.08); border-radius:.85rem; background:rgba(255,255,255,.035); color:#dce7f2; text-align:right; transition:.2s; } .quick-card:hover { border-color:rgba(255,122,0,.45); background:rgba(255,122,0,.08); transform:translateY(-2px); } .quick-card span { display:grid; place-items:center; color:#ff9a3d; } .quick-card strong { flex:1; font-size:.78rem; } .quick-card svg { color:#738ba3; }
+@media (max-width: 1100px) { .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .dashboard-grid { grid-template-columns:1fr; } .quick-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width: 640px) { .dashboard-page { padding:1.2rem .85rem 2rem; } .dashboard-hero { display:block; } .hero-action { margin-top:1.1rem; } .kpi-grid,.quick-grid { grid-template-columns:1fr; } .kpi-card { min-height:125px; } }
+
+/* Sidebar is a navigation rail, not a second report. */
+aside nav button > div > div:last-child { display:none; }
+aside nav button { min-height:2.65rem; border-radius:.75rem; }
+
 /* Strictly enforce tabular numerals & LTR embedding on financial figures, codes, IBANs, Jalali dates */
 .num-ltr {
   font-variant-numeric: tabular-nums;
