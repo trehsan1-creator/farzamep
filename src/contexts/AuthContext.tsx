@@ -172,7 +172,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const response = await fetch(`${credentials.url.replace(/\\/+$/, '')}/functions/v1/bootstrap-admin`, {
+      const baseUrl = credentials.url.endsWith('/') ? credentials.url.slice(0, -1) : credentials.url;
+      const response = await fetch(`${baseUrl}/functions/v1/bootstrap-admin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
