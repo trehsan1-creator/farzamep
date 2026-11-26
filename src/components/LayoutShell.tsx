@@ -13,6 +13,7 @@ import {
   X,
   UserCheck,
   ArrowLeftRight,
+  LogOut,
 } from 'lucide-react';
 import type { ActiveViewId } from '../types/erp';
 import { useFiscalYear } from '../contexts/FiscalYearContext';
@@ -24,6 +25,7 @@ interface LayoutShellProps {
   activeView: ActiveViewId;
   onSelectView: (view: ActiveViewId) => void;
   children: React.ReactNode;
+  onSignOut: () => Promise<void>;
 }
 
 const NAV_ITEMS: Array<{
@@ -76,7 +78,7 @@ const NAV_ITEMS: Array<{
   },
 ];
 
-export function LayoutShell({ activeView, onSelectView, children }: LayoutShellProps) {
+export function LayoutShell({ activeView, onSelectView, children, onSignOut }: LayoutShellProps) {
   const {
     fiscalYears,
     activeFiscalYear,
@@ -87,7 +89,6 @@ export function LayoutShell({ activeView, onSelectView, children }: LayoutShellP
     pendingAgentDraftsCount,
     userRole,
     isLiveSupabase,
-    setConnectionModalOpen,
   } = useFiscalYear();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -185,21 +186,17 @@ export function LayoutShell({ activeView, onSelectView, children }: LayoutShellP
           })}
         </nav>
 
-        {/* Sidebar Footer: Supabase Connection Trigger */}
+        {/* Database Environment Status — connection settings are deployment-managed */}
         <div className="border-t border-white/10 p-4">
-          <button
-            type="button"
-            onClick={() => setConnectionModalOpen(true)}
-            className="flex w-full items-center justify-between rounded-lg border border-white/15 bg-[#102333]/80 px-3.5 py-2.5 text-xs transition-colors hover:border-[#FF7A00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A00]"
-          >
+          <div className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-[#102333]/80 px-3.5 py-2.5 text-xs">
             <span className="flex items-center gap-2 font-medium text-[#F8FAFC]">
               <Database className="h-4 w-4 text-[#FF7A00]" />
-              <span>{isLiveSupabase ? 'Supabase متصل' : 'اتصال Supabase'}</span>
+              <span>پایگاه داده آزمایشی</span>
             </span>
-            <span className={`text-[11px] font-semibold ${isLiveSupabase ? 'text-[#10B981]' : 'text-[#94A3B8]'}`}>
-              {isLiveSupabase ? 'PostgreSQL' : 'تنظیمات'}
+            <span className={`text-[11px] font-semibold ${isLiveSupabase ? 'text-[#10B981]' : 'text-[#F59E0B]'}`}>
+              {isLiveSupabase ? 'متصل' : 'در حال اتصال'}
             </span>
-          </button>
+          </div>
         </div>
       </aside>
 
@@ -288,11 +285,20 @@ export function LayoutShell({ activeView, onSelectView, children }: LayoutShellP
                 </span>
               </button>
 
-              {/* User Role Indicator */}
+              {/* Authenticated identity and explicit sign-out */}
               <div className="hidden sm:flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#162D5B] px-3 py-1.5 text-xs text-[#F8FAFC] whitespace-nowrap shrink-0">
                 <UserCheck className="h-3.5 w-3.5 text-[#10B981]" />
                 <span>{userRole}</span>
               </div>
+              <button
+                type="button"
+                onClick={() => void onSignOut()}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-[#102333] px-3 py-1.5 text-xs font-semibold text-[#F8FAFC] transition-colors hover:border-[#ED2F42] hover:text-[#FCA5A5]"
+                aria-label="خروج امن از حساب"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>خروج</span>
+              </button>
             </div>
           </div>
 
