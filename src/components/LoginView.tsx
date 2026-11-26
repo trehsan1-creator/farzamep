@@ -1,23 +1,42 @@
 import { useState, type FormEvent } from 'react';
-import { AlertCircle, Eye, EyeOff, LockKeyhole, LogIn, ShieldCheck, UserRound } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, KeyRound, LockKeyhole, LogIn, ShieldCheck, UserRound, UserPlus } from 'lucide-react';
+import { BrandMark } from './BrandMark';
+
+interface LoginResult {
+  ok: boolean;
+  errorFa?: string;
+}
 
 interface LoginViewProps {
   configured: boolean;
-  onSubmit: (username: string, password: string) => Promise<{ ok: boolean; errorFa?: string }>;
+  onSubmit: (username: string, password: string) => Promise<LoginResult>;
+  onBootstrap: (input: {
+    username: string;
+    password: string;
+    fullName: string;
+    bootstrapCode: string;
+  }) => Promise<LoginResult>;
 }
 
-export function LoginView({ configured, onSubmit }: LoginViewProps) {
+export function LoginView({ configured, onSubmit, onBootstrap }: LoginViewProps) {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('مدیر اصلی');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [bootstrapCode, setBootstrapCode] = useState('');
+  const [bootstrapMode, setBootstrapMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorFa, setErrorFa] = useState('');
+  const [successFa, setSuccessFa] = useState('');
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorFa('');
+    setSuccessFa('');
+
     if (!configured) {
-      setErrorFa('اتصال Supabase برای این محیط تنظیم نشده است. متغیرهای Preview را بررسی کنید.');
+      setErrorFa('اتصال پایگاه داده برای این محیط تنظیم نشده است.');
       return;
     }
     if (!username.trim() || !password) {
@@ -29,8 +48,57 @@ export function LoginView({ configured, onSubmit }: LoginViewProps) {
     try {
       const result = await onSubmit(username.trim(), password);
       if (!result.ok) setErrorFa(result.errorFa || 'ورود انجام نشد. اطلاعات ورود را بررسی کنید.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBootstrap = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorFa('');
+    setSuccessFa('');
+
+    if (!configured) {
+      setErrorFa('اتصال پایگاه داده برای این محیط تنظیم نشده است.');
+      return;
+    }
+    if (!username.trim() || !fullName.trim() || !password || !bootstrapCode.trim()) {
+      setErrorFa('تمام فیلدهای ضروری را تکمیل کنید.');
+      return;
+    }
+    if (password.length < 12) {
+      setErrorFa('رمز عبور باید حداقل ۱۲ نویسه داشته باشد.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setErrorFa('تکرار رمز عبور با رمز اصلی یکسان نیست.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const created = await onBootstrap({
+        username: username.trim(),
+        password,
+        fullName: fullName.trim(),
+        bootstrapCode: bootstrapCode.trim(),
+      });
+
+      if (!created.ok) {
+        setErrorFa(created.errorFa || 'ساخت حساب مدیر انجام نشد.');
+        return;
+      }
+
+      const loginResult = await onSubmit(username.trim(), password);
+      if (!loginResult.ok) {
+        setBootstrapMode(false);
+        setSuccessFa('حساب مدیر ساخته شد. اکنون با همان نام کاربری و رمز عبور وارد شوید.');
+        setPassword('');
+        setConfirmPassword('');
+        setBootstrapCode('');
+      }
     } catch {
-      setErrorFa('ارتباط با سرویس ورود برقرار نشد. دوباره تلاش کنید.');
+      setErrorFa('ارتباط با سرویس احراز هویت برقرار نشد. دوباره تلاش کنید.');
     } finally {
       setSubmitting(false);
     }
@@ -40,25 +108,39 @@ export function LoginView({ configured, onSubmit }: LoginViewProps) {
     <main dir="rtl" className="min-h-screen bg-[#071522] px-4 py-10 text-[#F8FAFC] flex items-center justify-center">
       <div className="w-full max-w-md">
         <div className="rounded-2xl border border-white/10 bg-[#102333] p-7 shadow-2xl shadow-black/30">
-          <div className="mb-8 flex items-center gap-3">
-            <img src="/assets/af-logo.svg" alt="آتی فرزام" className="h-12 w-12 object-contain" />
-            <div>
-              <div className="text-lg font-extrabold tracking-tight">آتی فرزام</div>
-              <div className="mt-0.5 text-[11px] text-[#94A3B8]">سامانه یکپارچه هوشمندی مالی</div>
-            </div>
+          <div className="mb-8">
+            <BrandMark />
+            <div className="mt-2 text-[11px] text-[#94A3B8]">سامانه یکپارچه هوشمندی مالی</div>
           </div>
 
           <div className="mb-6">
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#FF7A00]/15 text-[#FF7A00]">
-              <ShieldCheck className="h-5 w-5" />
+              {bootstrapMode ? <UserPlus className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
             </div>
-            <h1 className="text-2xl font-extrabold">ورود به پنل مدیریت</h1>
+            <h1 className="text-2xl font-extrabold">
+              {bootstrapMode ? 'راه‌اندازی مدیر اصلی' : 'ورود به پنل مدیریت'}
+            </h1>
             <p className="mt-2 text-sm leading-6 text-[#94A3B8]">
-              برای دسترسی به اطلاعات مالی و ابزارهای هوشمند، وارد حساب سازمانی خود شوید.
+              {bootstrapMode
+                ? 'این فرایند فقط برای ایجاد اولین مدیر سامانه است و با کد یک‌بارمصرف مالک انجام می‌شود.'
+                : 'برای دسترسی به اطلاعات مالی و ابزارهای هوشمند، با حساب سازمانی خود وارد شوید.'}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={bootstrapMode ? handleBootstrap : handleLogin} className="space-y-4">
+            {bootstrapMode && (
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold text-[#CBD5E1]">نام و نام خانوادگی</span>
+                <input
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  autoComplete="name"
+                  placeholder="نام مدیر اصلی"
+                  className="h-12 w-full rounded-xl border border-white/10 bg-[#071522] px-3.5 text-sm outline-none focus:border-[#FF7A00]"
+                />
+              </label>
+            )}
+
             <label className="block">
               <span className="mb-2 block text-xs font-semibold text-[#CBD5E1]">نام کاربری</span>
               <span className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#071522] px-3.5 focus-within:border-[#FF7A00]">
@@ -71,6 +153,9 @@ export function LoginView({ configured, onSubmit }: LoginViewProps) {
                   className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#64748B]"
                 />
               </span>
+              {bootstrapMode && (
+                <span className="mt-1 block text-[10px] text-[#64748B]">نام کاربری فقط با حروف انگلیسی، عدد و . _ -</span>
+              )}
             </label>
 
             <label className="block">
@@ -79,10 +164,10 @@ export function LoginView({ configured, onSubmit }: LoginViewProps) {
                 <LockKeyhole className="h-4 w-4 shrink-0 text-[#64748B]" />
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  autoComplete={bootstrapMode ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="رمز عبور"
+                  placeholder={bootstrapMode ? 'حداقل ۱۲ نویسه' : 'رمز عبور'}
                   className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#64748B]"
                 />
                 <button
@@ -96,10 +181,46 @@ export function LoginView({ configured, onSubmit }: LoginViewProps) {
               </span>
             </label>
 
+            {bootstrapMode && (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold text-[#CBD5E1]">تکرار رمز عبور</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    className="h-12 w-full rounded-xl border border-white/10 bg-[#071522] px-3.5 text-sm outline-none focus:border-[#FF7A00]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold text-[#CBD5E1]">کد محرمانه راه‌اندازی</span>
+                  <span className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#071522] px-3.5 focus-within:border-[#FF7A00]">
+                    <KeyRound className="h-4 w-4 shrink-0 text-[#64748B]" />
+                    <input
+                      dir="ltr"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={bootstrapCode}
+                      onChange={(event) => setBootstrapCode(event.target.value)}
+                      placeholder="کد ۶۴ کاراکتری"
+                      className="h-12 min-w-0 flex-1 bg-transparent text-left font-mono text-xs outline-none placeholder:text-[#64748B]"
+                    />
+                  </span>
+                </label>
+              </>
+            )}
+
             {errorFa && (
               <div role="alert" className="flex items-start gap-2 rounded-lg border border-[#ED2F42]/40 bg-[#ED2F42]/10 p-3 text-xs leading-5 text-[#FCA5A5]">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{errorFa}</span>
+              </div>
+            )}
+
+            {successFa && (
+              <div role="status" className="rounded-lg border border-[#10B981]/40 bg-[#10B981]/10 p-3 text-xs leading-5 text-[#A7F3D0]">
+                {successFa}
               </div>
             )}
 
@@ -108,19 +229,35 @@ export function LoginView({ configured, onSubmit }: LoginViewProps) {
               disabled={submitting || !configured}
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#FF7A00] text-sm font-extrabold text-[#102333] transition hover:bg-[#ff8c24] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <LogIn className="h-4 w-4" />
-              <span>{submitting ? 'در حال بررسی...' : 'ورود امن به سامانه'}</span>
+              {bootstrapMode ? <UserPlus className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+              <span>
+                {submitting
+                  ? 'در حال بررسی...'
+                  : bootstrapMode
+                    ? 'ایجاد مدیر اصلی'
+                    : 'ورود امن به سامانه'}
+              </span>
             </button>
           </form>
 
-          <div className="mt-6 rounded-xl border border-white/10 bg-[#071522]/70 p-3.5 text-[11px] leading-6 text-[#94A3B8]">
-            <div className="mb-1 font-bold text-[#CBD5E1]">راه‌اندازی اولین مدیر</div>
-            اگر هنوز حسابی ساخته نشده، در Supabase به مسیر Authentication → Users بروید و کاربر
-            <span dir="ltr" className="mx-1 font-mono text-[#F8FAFC]">admin@farzam.local</span>
-            را ایجاد کنید. اولین حساب به‌صورت خودکار مدیر فعال می‌شود.
+          <div className="mt-6 border-t border-white/10 pt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setBootstrapMode((value) => !value);
+                setErrorFa('');
+                setSuccessFa('');
+              }}
+              className="text-xs font-semibold text-[#FFB36B] hover:text-white"
+            >
+              {bootstrapMode ? 'بازگشت به صفحه ورود' : 'راه‌اندازی اولین مدیر سامانه'}
+            </button>
+            <p className="mt-3 text-[10px] leading-5 text-[#64748B]">
+              ثبت‌نام عمومی غیرفعال است. حساب‌های جدید فقط با فعال‌سازی مدیر سامانه اجازه دسترسی دارند.
+            </p>
           </div>
         </div>
-        <p className="mt-5 text-center text-[10px] text-[#64748B]">محیط آزمایشی · ورود محدود به کاربران فعال سازمان</p>
+        <p className="mt-5 text-center text-[10px] text-[#64748B]">محیط آزمایشی · دسترسی محدود به کاربران فعال سازمان</p>
       </div>
     </main>
   );
