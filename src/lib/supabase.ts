@@ -177,11 +177,29 @@ export const supabaseGateway = {
 
       if (vRes.error) return null;
 
+      const bankTransactions: BankTransaction[] = (btRes.data ?? []).map((row: any) => ({
+        id: row.id, fiscal_year_id: row.fiscal_year_id, bank_name: row.bank_name ?? 'بانک', account_iban: row.bank_account_no ?? '',
+        quarter: String(row.tx_date_jalali ?? '').slice(5, 7) <= '03' ? 'Q1' : String(row.tx_date_jalali ?? '').slice(5, 7) <= '06' ? 'Q2' : String(row.tx_date_jalali ?? '').slice(5, 7) <= '09' ? 'Q3' : 'Q4',
+        jalali_date: row.tx_date_jalali ?? '', tracking_no: row.trace_no ?? row.doc_no ?? row.id, description_fa: row.description ?? '',
+        deposit_rial: Number(row.deposit_rial ?? 0), withdrawal_rial: Number(row.withdrawal_rial ?? 0), balance_rial: Number(row.running_balance_rial ?? 0),
+        continuity_verified: true, suggested_account_code: row.auto_category ?? '1100', is_documented: Boolean(row.reconciled_voucher_id), linked_voucher_id: row.reconciled_voucher_id ?? null,
+      }));
+      const moadianInvoices: MoadianInvoice[] = (moRes.data ?? []).map((row: any) => ({
+        id: row.id, fiscal_year_id: row.fiscal_year_id, direction: row.direction === 'SALE' ? 'SALES' : 'PURCHASE', quarter: row.quarter_code ?? 'Q1',
+        tax_id: row.tax_id, jalali_date: row.issue_date_jalali ?? '', counterparty_name: row.counterparty_name ?? '', counterparty_national_id: row.counterparty_national_id ?? '',
+        net_amount_rial: Number(row.net_amount_rial ?? 0), vat_amount_rial: Number(row.vat_amount_rial ?? 0), total_amount_rial: Number(row.gross_amount_rial ?? 0),
+        status_fa: row.status === 'تایید سیستمی' ? 'تایید شده' : (row.status ?? 'در انتظار تایید'), linked_voucher_id: row.reconciled_voucher_id ?? null,
+      }));
+      const fixedAssets: FixedAsset[] = (faRes.data ?? []).map((row: any) => ({
+        id: row.id, fiscal_year_id: row.fiscal_year_id, asset_code: row.asset_code, name_fa: row.description_fa ?? '', category_fa: 'اموال و تجهیزات',
+        art149_row: row.moadian_tax_id ?? '', acquisition_jalali: row.in_service_jalali ?? '', cost_rial: Number(row.cost_rial ?? 0), accumulated_depr_opening_rial: 0,
+        book_rate_pct: 0, statutory_rate_pct: 0, book_method: 'STRAIGHT_LINE', statutory_method: 'STRAIGHT_LINE', book_annual_depr_rial: Number(row.book_depr_fy_rial ?? 0), statutory_annual_depr_rial: Number(row.statutory_depr_fy_rial ?? 0), excess_disallowed_rial: Number(row.excess_disallowed_depr_rial ?? 0),
+      }));
       return {
         vouchers: (vRes.data ?? []) as Voucher[],
-        bankTransactions: (btRes.data ?? []) as BankTransaction[],
-        moadianInvoices: (moRes.data ?? []) as MoadianInvoice[],
-        fixedAssets: (faRes.data ?? []) as FixedAsset[],
+        bankTransactions,
+        moadianInvoices,
+        fixedAssets,
         agentApprovals: (aprRes.data ?? []) as AgentApprovalRequest[],
         tafsilParties: (tafRes.data ?? []) as TafsilParty[],
         products: (prdRes.data ?? []) as unknown as Product[],
