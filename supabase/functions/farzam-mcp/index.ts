@@ -11,10 +11,18 @@ const corsHeaders = {
 const toolDefinitions = [
   { name: "get_erp_context", description: "دریافت سال‌های مالی و کدینگ حساب‌های معین فعال. پیش از ثبت سند، ابتدا این ابزار را اجرا کنید.", inputSchema: { type: "object", properties: {} } },
   { name: "search_master_data", description: "جستجوی حساب‌های معین، اشخاص تفصیلی و کالاها با نام فارسی یا کد.", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+  { name: "query_erp", description: "موتور جستجوی کنترل‌شده و صفحه‌بندی‌شده برای پرسش‌های طبیعی درباره فاکتورهای فروش و خرید، بانک، طرف‌حساب‌ها، اسناد، دفترکل، مالیات و سال‌های مالی. اجرای SQL آزاد مجاز نیست.", inputSchema: { type: "object", properties: {
+    resource: { type: "string", enum: ["sales_invoices", "purchase_invoices", "bank_transactions", "parties", "vouchers", "voucher_lines", "tax_invoices", "fiscal_years"] },
+    fiscal_year_id: { type: "string" }, date_from: { type: "string" }, date_to: { type: "string" },
+    date_from_jalali: { type: "string" }, date_to_jalali: { type: "string" }, party_query: { type: "string" },
+    search: { type: "string" }, status: { type: "string" }, min_amount_rial: { type: "integer" }, max_amount_rial: { type: "integer" },
+    limit: { type: "integer", minimum: 1, maximum: 500 }, offset: { type: "integer", minimum: 0 },
+    sort_by: { type: "string" }, sort_direction: { type: "string", enum: ["asc", "desc"] }
+  }, required: ["resource"] } },
   { name: "get_trial_balance", description: "دریافت تراز آزمایشی ریالی برای یک سال مالی.", inputSchema: { type: "object", properties: { fiscal_year_id: { type: "string" }, include_drafts: { type: "boolean" } }, required: ["fiscal_year_id"] } },
   { name: "get_account_ledger", description: "مشاهده گردش دفتر معین برای یک حساب در سال مالی مشخص.", inputSchema: { type: "object", properties: { fiscal_year_id: { type: "string" }, account_code: { type: "string" }, limit: { type: "number" } }, required: ["fiscal_year_id", "account_code"] } },
   { name: "check_tax_compliance", description: "بررسی ریسک‌های مالیاتی: مازاد استهلاک ماده ۱۴۹، صورتحساب نامعتبر مؤدیان و برداشت بانکی بدون سند.", inputSchema: { type: "object", properties: { fiscal_year_id: { type: "string" } }, required: ["fiscal_year_id"] } },
-  { name: "list_unreconciled_bank_tx", description: "فهرست تراکنش‌های بانکی تطبیق‌نیافته در یک سال مالی.", inputSchema: { type: "object", properties: { fiscal_year_id: { type: "string" }, limit: { type: "number" } }, required: ["fiscal_year_id"] } },
+  { name: "list_unreconciled_bank_tx", description: "فهرست تراکنش‌های بانکی تطبیق‌نیافته در یک سال مالی با صفحه‌بندی کامل.", inputSchema: { type: "object", properties: { fiscal_year_id: { type: "string" }, limit: { type: "number" }, offset: { type: "number" } }, required: ["fiscal_year_id"] } },
   { name: "create_draft_voucher", description: "ثبت اتمیک پیش‌نویس سند دوطرفه تراز به‌همراه درخواست تأیید انسانی. عامل هوشمند هرگز سند را قطعی نمی‌کند.", inputSchema: { type: "object", properties: {
     fiscal_year_id: { type: "string" }, voucher_date_gregorian: { type: "string" }, voucher_date_jalali: { type: "string" },
     description: { type: "string" }, reference_no: { type: "string" }, idempotency_key: { type: "string" },
@@ -82,6 +90,94 @@ function ensureNoError<T>(result: { data: T | null; error: { message: string } |
   return result.data as T;
 }
 
+function boundedPage(args: Record<string, unknown>): { limit: number; offset: number } {
+  return {
+    limit: Math.max(1, Math.min(500, Number(args.limit ?? 100))),
+    offset: Math.max(0, Number(args.offset ?? 0)),
+  };
+}
+
+async function queryErp(db: SupabaseClient, args: Record<string, unknown>): Promise<unknown> {
+  const resource = String(args.resource ?? "");
+  const { limit, offset } = boundedPage(args);
+  const fiscalYearId = args.fiscal_year_id ? String(args.fiscal_year_id) : "";
+  const from = args.date_from ? String(args.date_from) : "";
+  const to = args.date_to ? String(args.date_to) : "";
+  const fromJalali = args.date_from_jalali ? String(args.date_from_jalali) : "";
+  const toJalali = args.date_to_jalali ? String(args.date_to_jalali) : "";
+  const party = args.party_query ? String(args.party_query).trim() : "";
+  const search = args.search ? String(args.search).trim() : "";
+  const status = args.status ? String(args.status) : "";
+  const min = Number.isFinite(Number(args.min_amount_rial)) ? Number(args.min_amount_rial) : null;
+  const max = Number.isFinite(Number(args.max_amount_rial)) ? Number(args.max_amount_rial) : null;
+
+  const invoiceResources = ["sales_invoices", "purchase_invoices", "tax_invoices"];
+  if (invoiceResources.includes(resource)) {
+    let q: any = db.from("moadian_invoices").select("id,fiscal_year_id,direction,tax_id,invoice_type,pattern,subject,status,issue_date_jalali,issue_date_gregorian,quarter_code,counterparty_name,tafsil_id,net_amount_rial,vat_amount_rial,gross_amount_rial,is_valid_for_tax", { count: "exact" });
+    if (resource === "sales_invoices") q = q.eq("direction", "SALE");
+    if (resource === "purchase_invoices") q = q.eq("direction", "PURCHASE");
+    if (fiscalYearId) q = q.eq("fiscal_year_id", fiscalYearId);
+    if (from) q = q.gte("issue_date_gregorian", from);
+    if (to) q = q.lte("issue_date_gregorian", to);
+    if (fromJalali) q = q.gte("issue_date_jalali", fromJalali);
+    if (toJalali) q = q.lte("issue_date_jalali", toJalali);
+    if (party) q = q.ilike("counterparty_name", `%${party.replace(/[%_]/g, "")}%`);
+    if (search) q = q.or(`counterparty_name.ilike.%${search.replace(/[%_,]/g, "")}% ,tax_id.ilike.%${search.replace(/[%_,]/g, "")}% ,subject.ilike.%${search.replace(/[%_,]/g, "")}%`);
+    if (status) q = q.eq("status", status);
+    if (min !== null) q = q.gte("gross_amount_rial", min);
+    if (max !== null) q = q.lte("gross_amount_rial", max);
+    const sort = ["issue_date_gregorian", "issue_date_jalali", "gross_amount_rial", "net_amount_rial", "counterparty_name"].includes(String(args.sort_by)) ? String(args.sort_by) : "issue_date_gregorian";
+    q = q.order(sort, { ascending: String(args.sort_direction ?? "desc") === "asc" }).range(offset, offset + limit - 1);
+    const result = await q;
+    const rows = ensureNoError(result) ?? [];
+    return { resource, rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
+  }
+
+  if (resource === "bank_transactions") {
+    let q: any = db.from("bank_transactions").select("id,fiscal_year_id,bank_account_no,tx_date_jalali,tx_date_gregorian,tx_time,operation_type,description,note,deposit_rial,withdrawal_rial,running_balance_rial,doc_no,trace_no,reconciled_voucher_id", { count: "exact" });
+    if (fiscalYearId) q = q.eq("fiscal_year_id", fiscalYearId);
+    if (from) q = q.gte("tx_date_gregorian", from);
+    if (to) q = q.lte("tx_date_gregorian", to);
+    if (fromJalali) q = q.gte("tx_date_jalali", fromJalali);
+    if (toJalali) q = q.lte("tx_date_jalali", toJalali);
+    if (search) q = q.or(`description.ilike.%${search.replace(/[%_,]/g, "")}% ,operation_type.ilike.%${search.replace(/[%_,]/g, "")}% ,note.ilike.%${search.replace(/[%_,]/g, "")}%`);
+    if (min !== null) q = q.or(`deposit_rial.gte.${min},withdrawal_rial.gte.${min}`);
+    if (max !== null) q = q.or(`deposit_rial.lte.${max},withdrawal_rial.lte.${max}`);
+    const sort = ["tx_date_gregorian", "tx_date_jalali", "deposit_rial", "withdrawal_rial", "running_balance_rial"].includes(String(args.sort_by)) ? String(args.sort_by) : "tx_date_gregorian";
+    q = q.order(sort, { ascending: String(args.sort_direction ?? "desc") === "asc" }).range(offset, offset + limit - 1);
+    const result = await q;
+    const rows = ensureNoError(result) ?? [];
+    return { resource, rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
+  }
+
+  if (resource === "parties") {
+    let q: any = db.from("tafsil_parties").select("id,tafsil_code,full_name,trade_name,party_type,legal_entity_type,national_id,economic_code,iban,is_active,metadata", { count: "exact" });
+    if (search || party) q = q.or(`full_name.ilike.%${(search || party).replace(/[%_,]/g, "")}% ,trade_name.ilike.%${(search || party).replace(/[%_,]/g, "")}% ,tafsil_code.eq.${(search || party).replace(/[%_,]/g, "")}`);
+    q = q.order("full_name", { ascending: true }).range(offset, offset + limit - 1);
+    const result = await q; const rows = ensureNoError(result) ?? [];
+    return { resource, rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
+  }
+
+  if (resource === "fiscal_years") {
+    let q: any = db.from("fiscal_years").select("id,code,title_fa,jalali_start,jalali_end,start_date,end_date,is_closed,last_voucher_no", { count: "exact" });
+    if (fiscalYearId) q = q.eq("id", fiscalYearId);
+    const result = await q.order("code", { ascending: true }).range(offset, offset + limit - 1); const rows = ensureNoError(result) ?? [];
+    return { resource, rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: false } };
+  }
+
+  if (resource === "vouchers" || resource === "voucher_lines") {
+    const table = resource === "vouchers" ? "vouchers" : "voucher_lines";
+    const fields = resource === "vouchers" ? "id,fiscal_year_id,voucher_no,voucher_type,status,voucher_date_gregorian,voucher_date_jalali,description,reference_no,created_by_actor,compliance_status,compliance_flags" : "id,voucher_id,fiscal_year_id,line_no,account_id,tafsil_id,debit_rial,credit_rial,line_description,moadian_tax_id,bank_trace_no";
+    let q: any = db.from(table).select(fields, { count: "exact" });
+    if (fiscalYearId) q = q.eq("fiscal_year_id", fiscalYearId);
+    if (status) q = q.eq("status", status);
+    if (search) q = resource === "vouchers" ? q.ilike("description", `%${search.replace(/[%_]/g, "")}%`) : q.ilike("line_description", `%${search.replace(/[%_]/g, "")}%`);
+    const result = await q.order(resource === "vouchers" ? "voucher_date_gregorian" : "line_no", { ascending: false }).range(offset, offset + limit - 1); const rows = ensureNoError(result) ?? [];
+    return { resource, rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
+  }
+  throw new Error("resource نامعتبر است. از یکی از منابع مجاز query_erp استفاده کنید.");
+}
+
 async function executeTool(db: SupabaseClient, name: string, args: Record<string, unknown>): Promise<unknown> {
   switch (name) {
     case "get_erp_context": {
@@ -102,6 +198,8 @@ async function executeTool(db: SupabaseClient, name: string, args: Record<string
       ]);
       return { accounts: ensureNoError(accounts), parties: ensureNoError(parties), products: ensureNoError(products) };
     }
+    case "query_erp":
+      return await queryErp(db, args);
     case "get_trial_balance": {
       const result = await db.rpc("fn_get_trial_balance", {
         p_fiscal_year_id: String(args.fiscal_year_id),
@@ -138,12 +236,13 @@ async function executeTool(db: SupabaseClient, name: string, args: Record<string
     }
     case "list_unreconciled_bank_tx": {
       const fy = String(args.fiscal_year_id ?? "");
-      const limit = Math.max(1, Math.min(100, Number(args.limit ?? 30)));
+      const { limit, offset } = boundedPage(args);
       const result = await db.from("bank_transactions")
-        .select("id,tx_date_jalali,tx_date_gregorian,tx_time,description,deposit_rial,withdrawal_rial,running_balance_rial,bank_account_no,doc_no,trace_no")
+        .select("id,tx_date_jalali,tx_date_gregorian,tx_time,description,deposit_rial,withdrawal_rial,running_balance_rial,bank_account_no,doc_no,trace_no", { count: "exact" })
         .eq("fiscal_year_id", fy).is("reconciled_voucher_id", null)
-        .order("tx_date_gregorian", { ascending: false }).limit(limit);
-      return ensureNoError(result);
+        .order("tx_date_gregorian", { ascending: false }).range(offset, offset + limit - 1);
+      const rows = ensureNoError(result) ?? [];
+      return { rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
     }
     case "create_draft_voucher": {
       const lines = Array.isArray(args.lines) ? args.lines as Array<Record<string, unknown>> : [];
@@ -303,3 +402,4 @@ Deno.serve(async (req: Request) => {
 
   return jsonResponse(400, { jsonrpc: "2.0", id, error: { code: -32601, message: `Method not found: ${method}` } });
 });
+
