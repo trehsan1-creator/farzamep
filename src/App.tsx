@@ -10,6 +10,7 @@ import { AgentQueueView } from './components/AgentQueueView';
 import { YearEndClosingView } from './components/YearEndClosingView';
 import { StatementsAndMcpView } from './components/StatementsAndMcpView';
 import { MasterDataView } from './components/MasterDataView';
+import { AgentManagementCenter } from './components/AgentManagementCenter';
 import { getSupabaseCredentials } from './lib/supabase';
 import type { ActiveViewId } from './types/erp';
 
@@ -36,6 +37,7 @@ function AuthenticatedWorkspace({ onSignOut }: { onSignOut: () => Promise<void> 
       {activeView === 'year_end' && <YearEndClosingView onNavigate={setActiveView} />}
       {activeView === 'statements' && <StatementsAndMcpView />}
       {activeView === 'master_data' && <MasterDataView />}
+      {activeView === 'agent_center' && <AgentManagementCenter />}
     </LayoutShell>
   );
 }
@@ -80,3 +82,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

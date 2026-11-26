@@ -7,6 +7,7 @@ import {
   CalendarCheck2,
   FileBarChart2,
   Database,
+  ShieldCheck,
   Lock,
   Layers,
   Menu,
@@ -36,45 +37,51 @@ const NAV_ITEMS: Array<{
 }> = [
   {
     id: 'dashboard',
-    labelFa: 'داشبورد مالی و انطباق',
-    shortDescFa: 'شاخص‌ها، جریان نقدی و ریسک مالیاتی',
+    labelFa: 'نمای کلی',
+    shortDescFa: 'تصمیم‌های مهم امروز',
     icon: LayoutDashboard,
   },
   {
     id: 'vouchers',
-    labelFa: 'اسناد حسابداری',
-    shortDescFa: 'میز کار سند دوطرفه و دفتر کل',
+    labelFa: 'اسناد و دفتر کل',
+    shortDescFa: 'ثبت و بررسی اسناد',
     icon: BookOpenCheck,
   },
   {
     id: 'excel_import',
-    labelFa: 'ورود گروهی اکسل و مغایرت‌گیری',
+    labelFa: 'ورود اطلاعات',
     shortDescFa: 'اقتصاد نوین، مودیان، تجهیزات، تراز',
     icon: FileSpreadsheet,
   },
   {
     id: 'agent_queue',
-    labelFa: 'صف تأیید اسناد هوش مصنوعی',
+    labelFa: 'صف تأیید Muse',
     shortDescFa: 'پیشنویس‌های Muse.ai با امضای انسانی',
     icon: Bot,
   },
   {
     id: 'year_end',
-    labelFa: 'بستن سال مالی و افتتاحیه',
+    labelFa: 'بستن سال مالی',
     shortDescFa: 'مواد ۱۰۵، ۱۴۹ و ۲۳۸ قانون تجارت',
     icon: CalendarCheck2,
   },
   {
     id: 'statements',
-    labelFa: 'صورت‌های مالی و اتصال Muse.ai',
+    labelFa: 'گزارش‌ها و اتصال Muse',
     shortDescFa: 'گزارش‌های رسمی چاپی و کنسول MCP',
     icon: FileBarChart2,
   },
   {
     id: 'master_data',
-    labelFa: 'کدینگ حساب‌ها و اطلاعات پایه',
+    labelFa: 'اطلاعات پایه',
     shortDescFa: '۲۰ معین، تفصیلی‌ها، کالاها و اموال',
     icon: Layers,
+  },
+  {
+    id: 'agent_center',
+    labelFa: 'مرکز Agentها',
+    shortDescFa: 'اتصال‌ها، ابزارها، فعالیت و ممیزی',
+    icon: ShieldCheck,
   },
 ];
 
@@ -324,3 +331,4 @@ export function LayoutShell({ activeView, onSelectView, children, onSignOut }: L
     </div>
   );
 }
+

@@ -224,7 +224,8 @@ export type ActiveViewId =
   | 'agent_queue'
   | 'year_end'
   | 'statements'
-  | 'master_data';
+  | 'master_data'
+  | 'agent_center';
 
 export type ExcelFormatType =
   | 'BANK_EGHTESAD_NOVIN'
@@ -269,3 +270,4 @@ export interface ParsedExcelResult {
   columns: Array<{ key: string; labelFa: string; isNumeric?: boolean; isLtr?: boolean }>;
   rows: ParsedExcelRow[];
 }
+
