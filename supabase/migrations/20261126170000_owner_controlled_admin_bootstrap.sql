@@ -10,9 +10,8 @@ CREATE TABLE IF NOT EXISTS private.auth_bootstrap_tokens (
 ALTER TABLE private.auth_bootstrap_tokens ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE private.auth_bootstrap_tokens FROM PUBLIC, anon, authenticated, service_role;
 
-INSERT INTO private.auth_bootstrap_tokens (token_hash)
-VALUES ('4435a86cfe2984f7562f183c0f0f375e0953d267af794dccf32e54dc8d896396')
-ON CONFLICT (token_hash) DO NOTHING;
+-- Provision the one-time token hash separately through a secure database operation.
+-- Never commit the token hash: anyone able to write auth user metadata could otherwise claim the first admin.
 
 CREATE OR REPLACE FUNCTION private.fn_handle_new_auth_user()
 RETURNS TRIGGER
