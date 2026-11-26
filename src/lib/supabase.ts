@@ -171,8 +171,8 @@ export const supabaseGateway = {
         client.from('moadian_invoices').select('*').eq('fiscal_year_id', fiscalYearId),
         client.from('fixed_assets').select('*').eq('fiscal_year_id', fiscalYearId),
         client.from('agent_approval_requests').select('*').eq('fiscal_year_id', fiscalYearId),
-        client.from('tafsil_parties').select('*').order('code', { ascending: true }),
-        client.from('products').select('*').order('sku', { ascending: true }),
+        client.from('tafsil_parties').select('id,code:tafsil_code,name_fa:full_name,party_type,national_id,economic_code,iban').order('tafsil_code', { ascending: true }),
+        client.from('products').select('id,sku:product_code,name_fa,unit_fa,is_vat_subject').order('product_code', { ascending: true }),
       ]);
 
       if (vRes.error) return null;
@@ -184,7 +184,7 @@ export const supabaseGateway = {
         fixedAssets: (faRes.data ?? []) as FixedAsset[],
         agentApprovals: (aprRes.data ?? []) as AgentApprovalRequest[],
         tafsilParties: (tafRes.data ?? []) as TafsilParty[],
-        products: (prdRes.data ?? []) as Product[],
+        products: (prdRes.data ?? []) as unknown as Product[],
       };
     } catch {
       return null;

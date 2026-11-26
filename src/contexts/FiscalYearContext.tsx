@@ -107,11 +107,11 @@ interface FiscalYearContextValue {
 
 const FiscalYearContext = createContext<FiscalYearContextValue | null>(null);
 
-export function FiscalYearProvider({ children }: { children: React.ReactNode }) {
+export function FiscalYearProvider({ children, userRole: initialUserRole = 'کاربر سازمانی' }: { children: React.ReactNode; userRole?: string }) {
   const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>(SEED_FISCAL_YEARS);
-  const [activeFiscalYearId, setActiveFiscalYearId] = useState<string>('fy-1404');
+  const [activeFiscalYearId, setActiveFiscalYearId] = useState<string>('');
   const [currencyUnit, setCurrencyUnit] = useState<CurrencyUnit>('RIAL');
-  const [userRole] = useState<string>('مدیر مالی ارشد (تأییدکننده انسانی)');
+  const [userRole] = useState<string>(initialUserRole);
 
   const [supabaseCreds, setSupabaseCreds] = useState<SupabaseCredentials>(() => getSupabaseCredentials());
   const [isLiveSupabase, setIsLiveSupabase] = useState<boolean>(false);
@@ -156,7 +156,16 @@ export function FiscalYearProvider({ children }: { children: React.ReactNode }) 
         supabaseGateway.fetchScopedData(fyId),
       ]);
 
-      if (remoteFys) setFiscalYears(remoteFys);
+      if (remoteFys?.length) {
+        setFiscalYears(remoteFys);
+        setActiveFiscalYearId((current) =>
+          remoteFys.some((fy) => fy.id === current)
+            ? current
+            : remoteFys.find((fy) => fy.code === '1405')?.id ??
+              remoteFys.find((fy) => !fy.is_closed)?.id ??
+              remoteFys[0].id
+        );
+      }
       if (remoteAccounts) setAccounts(remoteAccounts);
       if (scoped) {
         setAllVouchers((prev) => [
@@ -179,8 +188,8 @@ export function FiscalYearProvider({ children }: { children: React.ReactNode }) 
           ...prev.filter((a) => a.fiscal_year_id !== fyId),
           ...scoped.agentApprovals,
         ]);
-        if (scoped.tafsilParties.length > 0) setTafsilParties(scoped.tafsilParties);
-        if (scoped.products.length > 0) setProducts(scoped.products);
+        setTafsilParties(scoped.tafsilParties);
+        setProducts(scoped.products);
       }
     },
     []
