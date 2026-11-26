@@ -7,6 +7,7 @@ import {
   CalendarCheck2,
   FileBarChart2,
   Database,
+  ShieldCheck,
   Lock,
   Layers,
   Menu,
@@ -75,6 +76,12 @@ const NAV_ITEMS: Array<{
     labelFa: 'کدینگ حساب‌ها و اطلاعات پایه',
     shortDescFa: '۲۰ معین، تفصیلی‌ها، کالاها و اموال',
     icon: Layers,
+  },
+  {
+    id: 'agent_center',
+    labelFa: 'مرکز مدیریت Agentها',
+    shortDescFa: 'اتصال‌ها، ابزارها، فعالیت و ممیزی',
+    icon: ShieldCheck,
   },
 ];
 
@@ -324,3 +331,4 @@ export function LayoutShell({ activeView, onSelectView, children, onSignOut }: L
     </div>
   );
 }
+
