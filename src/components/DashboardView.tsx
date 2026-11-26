@@ -21,8 +21,13 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
       if (row.account_code === '5101') cogs = net;
       if (row.account_code === '6101' || row.account_code === '6105') opex += net;
     }
-    return { assets, cash, sales, cogs, opex, grossProfit: sales - cogs };
-  }, [trialBalance]);
+    const valid = (status: string) => status !== 'باطل شده' && status !== 'رد شده';
+    const rawSales = moadianInvoices.filter((invoice) => invoice.direction === 'SALES' && valid(invoice.status_fa)).reduce((sum, invoice) => sum + invoice.net_amount_rial, 0);
+    const rawPurchases = moadianInvoices.filter((invoice) => invoice.direction === 'PURCHASE' && valid(invoice.status_fa)).reduce((sum, invoice) => sum + invoice.net_amount_rial, 0);
+    const deposits = bankTransactions.reduce((sum, row) => sum + row.deposit_rial, 0);
+    const withdrawals = bankTransactions.reduce((sum, row) => sum + row.withdrawal_rial, 0);
+    return { assets, cash, sales, cogs, opex, grossProfit: sales - cogs, rawSales, rawPurchases, bankNet: deposits - withdrawals, ledgerReady: vouchers.length > 0 };
+  }, [trialBalance, moadianInvoices, bankTransactions, vouchers.length]);
   const exposure = useMemo(() => computeTaxComplianceExposure(bankTransactions, fixedAssets, moadianInvoices), [bankTransactions, fixedAssets, moadianInvoices]);
   const unit = unitLabelFa(currencyUnit);
   const finalized = vouchers.filter((v) => v.status === 'FINALIZED').length;
@@ -43,11 +48,13 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     </section>
 
     <section className="kpi-grid" aria-label="شاخص‌های کلیدی">
-      <Kpi icon={<WalletCards />} label="دارایی خالص" value={formatCurrency(metrics.assets, currencyUnit)} hint={`${toPersianDigits(finalized)} سند قطعی`} tone="blue" />
-      <Kpi icon={<Landmark />} label="نقد و بانک" value={formatCurrency(metrics.cash, currencyUnit)} hint="حساب‌های عملیاتی" tone="teal" />
-      <Kpi icon={<TrendingUp />} label="فروش خالص" value={formatCurrency(metrics.sales, currencyUnit)} hint={`حاشیه سود ${metrics.sales > 0 ? toPersianDigits(Math.round((metrics.grossProfit / metrics.sales) * 100)) : '۰'}٪`} tone="orange" />
+      <Kpi icon={<TrendingUp />} label="فروش معتبر ۱۴۰۴" value={formatCurrency(metrics.ledgerReady ? metrics.sales : metrics.rawSales, currencyUnit)} hint={metrics.ledgerReady ? 'از دفتر کل' : 'از صورتحساب‌های مودیان · خام'} tone="orange" />
+      <Kpi icon={<WalletCards />} label="خالص گردش بانک" value={formatCurrency(metrics.ledgerReady ? metrics.cash : metrics.bankNet, currencyUnit)} hint={metrics.ledgerReady ? 'از اسناد حسابداری' : 'از ۱۸۰ تراکنش بانکی'} tone="teal" />
+      <Kpi icon={<Landmark />} label="خرید معتبر ۱۴۰۴" value={formatCurrency(metrics.ledgerReady ? metrics.cogs : metrics.rawPurchases, currencyUnit)} hint={metrics.ledgerReady ? 'بهای تمام‌شده' : 'از صورتحساب‌های مودیان · خام'} tone="blue" />
       <Kpi icon={<ShieldCheck />} label="ریسک مالیاتی" value={formatCurrency(exposure.totalExposureRial, currencyUnit)} hint={`${toPersianDigits(exposure.rejectedMoadianCount)} مورد نیازمند بررسی`} tone={exposure.totalExposureRial > 0 ? 'red' : 'teal'} />
     </section>
+
+    {!metrics.ledgerReady && <div className="data-trust-banner"><CircleAlert size={18} /><div><strong>لایه حسابداری ۱۴۰۴ هنوز سند ندارد</strong><span>شاخص‌های فروش، خرید و بانک از داده‌های خام معتبر نمایش داده شده‌اند؛ برای تراز و سود قطعی باید اسناد حسابداری ایجاد و تأیید شوند.</span></div><button type="button" onClick={() => onNavigate('agent_queue')}>مشاهده صف اقدام <ArrowLeft size={15} /></button></div>}
 
     <section className="dashboard-grid">
       <div className="panel-card cash-card">
