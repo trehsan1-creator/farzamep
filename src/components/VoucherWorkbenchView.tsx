@@ -765,7 +765,7 @@ export function VoucherWorkbenchView() {
                       <button
                         type="button"
                         disabled={isReadOnly}
-                        onClick={() => startEditDraft(selectedVoucher)
+                        onClick={() => startEditDraft(selectedVoucher)}
                         className="rounded-lg bg-[#FF7A00] px-3.5 py-2 text-xs font-bold text-[#102333] hover:bg-[#ff8c24] disabled:opacity-40"
                       >
                         ویرایش پیشنویس
