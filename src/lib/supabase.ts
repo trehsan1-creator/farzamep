@@ -265,7 +265,7 @@ export const supabaseGateway = {
           id: String(row.id),
           fiscal_year_id: String(row.fiscal_year_id),
           bank_name: row.bank_name ?? 'بانک',
-          account_iban: row.bank_account_no ?? null,
+          bank_account_no: row.bank_account_no ?? null,
           quarter,
           jalali_date: row.tx_date_jalali ?? '',
           tracking_no: row.trace_no ?? row.doc_no ?? String(row.id),
