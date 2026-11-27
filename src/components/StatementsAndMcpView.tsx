@@ -55,7 +55,7 @@ const MCP_TOOLS: Array<{
     name: 'create_draft_voucher',
     permission: 'Write',
     descFa: 'ثبت اتمیک سند در وضعیت DRAFT با کلید یکتا idempotency_key و صف تأیید انسانی',
-    rpcTarget: 'fn_create_voucher_atomic',
+    rpcTarget: 'fn_create_voucher_draft_atomic',
   },
   {
     name: 'simulate_year_end_closing',
