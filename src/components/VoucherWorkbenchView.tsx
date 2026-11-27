@@ -261,7 +261,7 @@ export function VoucherWorkbenchView() {
         <div>
           <h1 className="text-2xl font-extrabold text-[#F8FAFC]">میز کار اسناد حسابداری و دفتر کل</h1>
           <p className="mt-1 text-xs text-[#94A3B8]">
-            ثبت اتمیک اسناد دوطرفه (<span className="mono-ltr">fn_create_voucher_atomic</span>) · کنترل زنده تراز و قوانین مالیاتی ایران (مواد ۱۴۷، ۸۶، ۵۳، ۱۰۴ منسوخ و ۱۴۹)
+            ثبت اتمیک اسناد دوطرفه (<span className="mono-ltr">fn_create_voucher_draft_atomic</span>) · کنترل زنده تراز و قوانین مالیاتی ایران (مواد ۱۴۷، ۸۶، ۵۳، ۱۰۴ منسوخ و ۱۴۹)
           </p>
         </div>
 
@@ -699,7 +699,7 @@ export function VoucherWorkbenchView() {
                   className="inline-flex items-center gap-2 rounded-lg bg-[#FF7A00] px-5 py-2.5 text-xs font-bold text-[#102333] transition-colors hover:bg-[#ff8c24] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Save className="h-4 w-4" />
-                  <span>{saving ? 'در حال ثبت اتمیک...' : 'ثبت اتمیک سند (fn_create_voucher_atomic)'}</span>
+                  <span>{saving ? 'در حال ثبت اتمیک...' : 'ثبت اتمیک سند (fn_create_voucher_draft_atomic)'}</span>
                 </button>
               </div>
             </div>
