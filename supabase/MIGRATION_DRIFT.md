@@ -22,6 +22,10 @@ The live Supabase project reports these applied versions:
 | 20261127183226 | erp_voucher_rpc_and_approval_hardening |
 | 20261127183659 | erp_restore_private_rpc_guardrails |
 | 20261127191459 | restrict_anon_accounting_rpcs |
+| 20261127194603 | add_bank_party_group |
+| 20261127194917 | sales_invoice_engine_mvp |
+| 20261127195122 | sales_rpc_private_boundary_and_indexes |
+| 20261127195351 | product_sales_settings_rpc |
 
 ## Repository state
 
@@ -30,11 +34,13 @@ The live Supabase project reports these applied versions:
 - The additive `20261126200000_query_erp_agent_scope.sql` remains in the repository. The live Muse credential already includes `query_erp`; its effect is present in production even though that local version is not separately listed in remote migration history.
 - The original baseline migrations `20261126170251`, `20261126170310`, `20261126170530`, `20261126170604`, `20261126171013`, and `20261126181005` are not currently present as source files in this repository.
 - Migration `20261127191459` removes anonymous execution from the accounting reporting RPCs while retaining access for authenticated users and the service role.
+- Migrations `20261127194603`–`20261127195351` add the BANK party type, commercial sales documents, line-level tax snapshots, payment receipts, inventory movements, private RPC boundaries, supporting indexes, and product sales settings. The exact SQL files are now tracked in `supabase/migrations/`.
+- The production Muse MCP Edge Function is deployed at version 6. Its credential now allows safe draft sales-document creation, sales-document listing/detail retrieval, and inventory-stock reads. It cannot issue invoices, record receipts, or finalize accounting vouchers.
 
 ## Operational guardrail
 
 **Do not run `supabase db push`, `supabase db reset`, or an automated migration replay against Production until the missing baseline migrations are reconstructed and the local/remote histories are reconciled.**
 
-The current production database has been updated through controlled Supabase migration actions. The voucher write-path, fiscal-year lock, RPC-boundary, agent-review guardrail, and anonymous RPC-access migrations are tracked using the exact versions returned by Supabase. This does not make the repository a fully reproducible fresh-install source yet.
+The current production database has been updated through controlled Supabase migration actions. The voucher write-path, fiscal-year lock, RPC-boundary, agent-review guardrail, anonymous RPC-access, and sales/inventory migrations are tracked using the exact versions returned by Supabase. This does not make the repository a fully reproducible fresh-install source yet.
 
 A separate schema-baseline recovery task is required before using this repository to provision a new Supabase project or replay the entire history.
