@@ -20,6 +20,7 @@ The live Supabase project reports these applied versions:
 | 20261127182701 | erp_voucher_write_path_hardening |
 | 20261127183045 | erp_fiscal_year_rls_lock_fix |
 | 20261127183226 | erp_voucher_rpc_and_approval_hardening |
+| 20261127183659 | erp_restore_private_rpc_guardrails |
 
 ## Repository state
 
@@ -32,6 +33,6 @@ The live Supabase project reports these applied versions:
 
 **Do not run \`supabase db push\`, \`supabase db reset\`, or an automated migration replay against Production until the missing baseline migrations are reconstructed and the local/remote histories are reconciled.**
 
-The current production database has been updated through the controlled Supabase migration action, and the two new migration files are tracked using the exact versions returned by Supabase. This does not make the repository a fully reproducible fresh-install source yet.
+The current production database has been updated through controlled Supabase migration actions. The voucher write-path, fiscal-year lock, RPC-boundary, and agent-review guardrail migrations are tracked using the exact versions returned by Supabase. This does not make the repository a fully reproducible fresh-install source yet.
 
 A separate schema-baseline recovery task is required before using this repository to provision a new Supabase project or replay the entire history.
