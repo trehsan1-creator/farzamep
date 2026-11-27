@@ -124,7 +124,7 @@ export interface BankTransaction {
   id: string;
   fiscal_year_id: string;
   bank_name: string;
-  account_iban: string | null;
+  bank_account_no: string | null;
   quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   jalali_date: string;
   tracking_no: string;
