@@ -12,14 +12,14 @@ const toolDefinitions = [
   { name: "get_erp_context", description: "دریافت سال‌های مالی و کدینگ حساب‌های معین فعال. پیش از ثبت سند، ابتدا این ابزار را اجرا کنید.", inputSchema: { type: "object", properties: {} } },
   { name: "search_master_data", description: "جستجوی حساب‌های معین، اشخاص تفصیلی و کالاها با نام فارسی یا کد.", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
   { name: "query_erp", description: "موتور جستجوی کنترل‌شده و صفحه‌بندی‌شده برای پرسش‌های طبیعی درباره فاکتورهای فروش و خرید، بانک، طرف‌حساب‌ها، اسناد، دفترکل، مالیات و سال‌های مالی. اجرای SQL آزاد مجاز نیست.", inputSchema: { type: "object", properties: {
-    resource: { type: "string", enum: ["sales_invoices", "purchase_invoices", "bank_transactions", "parties", "vouchers", "voucher_lines", "tax_invoices", "fiscal_years"] },
+    resource: { type: "string", enum: ["sales_invoices", "sales_quotes", "purchase_invoices", "bank_transactions", "parties", "vouchers", "voucher_lines", "tax_invoices", "fiscal_years", "inventory_stock"] },
     fiscal_year_id: { type: "string" }, date_from: { type: "string" }, date_to: { type: "string" },
     date_from_jalali: { type: "string" }, date_to_jalali: { type: "string" }, party_query: { type: "string" },
     search: { type: "string" }, status: { type: "string" }, min_amount_rial: { type: "integer" }, max_amount_rial: { type: "integer" },
-    limit: { type: "integer", minimum: 1, maximum: 500 }, offset: { type: "integer", minimum: 0 },
+    limit: { type: "integer", minimum: 1, maximum: 500 }, offset: { type: "integer", minimum: 0 }, warehouse_id: { type: "string" }, product_id: { type: "string" },
     sort_by: { type: "string" }, sort_direction: { type: "string", enum: ["asc", "desc"] }
   }, required: ["resource"] } },
-  { name: "propose_accounting_entries", description: "تبدیل کنترل‌شده و فقط‌خواندنی فاکتورهای خام فروش یا خرید به پیشنهاد سند حسابداری متوازن؛ هیچ رکوردی ایجاد نمی‌کند. هر پیشنهاد شامل حساب‌ها، طرف حساب، مبلغ، دلیل و هشدارهای بررسی است.", inputSchema: { type: "object", properties: {
+  { name: "propose_accounting_entries", description: "تبدیل کنترل‌شده و فقط‌خواندنی صورتحساب‌های خام واردشده از سامانه مؤدیان به پیشنهاد سند حسابداری متوازن؛ هیچ رکوردی ایجاد نمی‌کند. این ابزار از فاکتورهای تجاری داخلی جداست. هر پیشنهاد شامل حساب‌ها، طرف حساب، مبلغ، دلیل و هشدارهای بررسی است.", inputSchema: { type: "object", properties: {
     source_type: { type: "string", enum: ["sales_invoices", "purchase_invoices"] }, fiscal_year_id: { type: "string" },
     date_from_jalali: { type: "string" }, date_to_jalali: { type: "string" }, party_query: { type: "string" },
     limit: { type: "integer", minimum: 1, maximum: 100 }
@@ -38,6 +38,57 @@ const toolDefinitions = [
       debit_rial: { type: "integer" }, credit_rial: { type: "integer" }, moadian_tax_id: { type: "string" }, bank_trace_no: { type: "string" }
     }, required: ["account_code", "debit_rial", "credit_rial"] } }
   }, required: ["fiscal_year_id", "voucher_date_gregorian", "voucher_date_jalali", "description", "idempotency_key", "lines"] } },
+  {
+    name: "create_sales_document_draft",
+    description: "ساخت پیش‌نویس پیش‌فاکتور یا فاکتور تجاری از مشتری و کالاهای موجود. ابتدا search_master_data را برای یافتن شناسه مشتری و کالا اجرا کن. عامل فقط پیش‌نویس می‌سازد و اجازه صدور فاکتور، ثبت دریافت یا قطعی‌کردن سند حسابداری را ندارد؛ صدور فقط با اقدام انسانی انجام می‌شود.",
+    inputSchema: { type: "object", properties: {
+      fiscal_year_id: { type: "string" },
+      document_type: { type: "string", enum: ["QUOTE", "INVOICE"] },
+      party_id: { type: "string" },
+      issue_date_gregorian: { type: "string" },
+      issue_date_jalali: { type: "string" },
+      due_date_gregorian: { type: "string" },
+      due_date_jalali: { type: "string" },
+      valid_until_gregorian: { type: "string" },
+      valid_until_jalali: { type: "string" },
+      warehouse_id: { type: "string" },
+      notes: { type: "string" },
+      terms: { type: "string" },
+      idempotency_key: { type: "string" },
+      lines: { type: "array", minItems: 1, items: { type: "object", properties: {
+        product_id: { type: "string" },
+        description: { type: "string" },
+        unit_fa: { type: "string" },
+        quantity: { type: "number" },
+        unit_price_rial: { type: "integer" },
+        discount_rial: { type: "integer" },
+        is_vat_subject: { type: "boolean" },
+        vat_rate_pct: { type: "number" }
+      }, required: ["quantity", "unit_price_rial"] } }
+    }, required: ["fiscal_year_id", "document_type", "party_id", "issue_date_gregorian", "issue_date_jalali", "idempotency_key", "lines"] }
+  },
+  {
+    name: "list_sales_documents",
+    description: "فهرست صفحه‌بندی‌شده پیش‌فاکتورها و فاکتورهای تجاری داخلی در سال مالی؛ این داده‌ها با صورتحساب‌های واردشده از سامانه مؤدیان جدا هستند.",
+    inputSchema: { type: "object", properties: {
+      fiscal_year_id: { type: "string" },
+      document_type: { type: "string", enum: ["QUOTE", "INVOICE"] },
+      status: { type: "string" },
+      party_id: { type: "string" },
+      limit: { type: "integer", minimum: 1, maximum: 200 },
+      offset: { type: "integer", minimum: 0 }
+    } }
+  },
+  {
+    name: "get_sales_document",
+    description: "دریافت جزئیات یک پیش‌فاکتور یا فاکتور داخلی به همراه ردیف‌ها، پرداخت‌ها و وضعیت سند حسابداری.",
+    inputSchema: { type: "object", properties: { document_id: { type: "string" } }, required: ["document_id"] }
+  },
+  {
+    name: "get_inventory_stock",
+    description: "مشاهده موجودی ثبت‌شده کالاها به تفکیک انبار. برای نام و کد کالا از search_master_data استفاده کن.",
+    inputSchema: { type: "object", properties: { warehouse_id: { type: "string" }, product_id: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 500 }, offset: { type: "integer", minimum: 0 } } }
+  },
   { name: "get_approval_status", description: "استعلام وضعیت تأیید پیش‌نویس عامل هوشمند با شناسه درخواست یا سند.", inputSchema: { type: "object", properties: { approval_id: { type: "string" }, voucher_id: { type: "string" } } } },
   { name: "simulate_year_end_closing", description: "شبیه‌سازی فقط‌خواندنی بستن سال مالی؛ هیچ سندی قطعی یا سالی بسته نمی‌شود.", inputSchema: { type: "object", properties: { fiscal_year_id: { type: "string" }, include_drafts: { type: "boolean" } }, required: ["fiscal_year_id"] } },
   { name: "request_year_end_closing", description: "ثبت درخواست بستن سال مالی در صف تأیید مدیر مالی؛ اجرای قطعی فقط با انسان است.", inputSchema: { type: "object", properties: { fiscal_year_id: { type: "string" }, next_fiscal_year_id: { type: "string" }, rationale_fa: { type: "string" } }, required: ["fiscal_year_id", "next_fiscal_year_id"] } },
@@ -116,24 +167,65 @@ async function queryErp(db: SupabaseClient, args: Record<string, unknown>): Prom
   const min = Number.isFinite(Number(args.min_amount_rial)) ? Number(args.min_amount_rial) : null;
   const max = Number.isFinite(Number(args.max_amount_rial)) ? Number(args.max_amount_rial) : null;
 
-  const invoiceResources = ["sales_invoices", "purchase_invoices", "tax_invoices"];
-  if (invoiceResources.includes(resource)) {
-    let q: any = db.from("moadian_invoices").select("id,fiscal_year_id,direction,tax_id,invoice_type,pattern,subject,status,issue_date_jalali,issue_date_gregorian,quarter_code,counterparty_name,tafsil_id,net_amount_rial,vat_amount_rial,gross_amount_rial,is_valid_for_tax", { count: "exact" });
-    if (resource === "sales_invoices") q = q.eq("direction", "SALE");
+  if (resource === "sales_invoices" || resource === "sales_quotes") {
+    const documentType = resource === "sales_invoices" ? "INVOICE" : "QUOTE";
+    let q: any = db.from("sales_documents").select(
+      "id,fiscal_year_id,document_type,document_no,status,issue_date_gregorian,issue_date_jalali,party_id,party_name_snapshot,subtotal_rial,discount_rial,tax_rial,total_rial,paid_rial,balance_rial,voucher_id,created_by_actor",
+      { count: "exact" }
+    ).eq("document_type", documentType);
+    if (fiscalYearId) q = q.eq("fiscal_year_id", fiscalYearId);
+    if (from) q = q.gte("issue_date_gregorian", from);
+    if (to) q = q.lte("issue_date_gregorian", to);
+    if (fromJalali) q = q.gte("issue_date_jalali", fromJalali);
+    if (toJalali) q = q.lte("issue_date_jalali", toJalali);
+    if (party) q = q.ilike("party_name_snapshot", "%" + party.replace(/[%_]/g, "") + "%");
+    if (search) {
+      const clean = search.replace(/[%_,]/g, "");
+      q = q.or("party_name_snapshot.ilike.%" + clean + "%,document_no.eq." + (Number.isInteger(Number(clean)) ? Number(clean) : -1));
+    }
+    if (status) q = q.eq("status", status);
+    if (min !== null) q = q.gte("total_rial", min);
+    if (max !== null) q = q.lte("total_rial", max);
+    const sort = ["issue_date_gregorian", "issue_date_jalali", "total_rial", "document_no", "party_name_snapshot"].includes(String(args.sort_by))
+      ? String(args.sort_by) : "issue_date_gregorian";
+    q = q.order(sort, { ascending: String(args.sort_direction ?? "desc") === "asc" }).range(offset, offset + limit - 1);
+    const result = await q;
+    const rows = ensureNoError(result) ?? [];
+    return { resource, rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
+  }
+
+  if (resource === "purchase_invoices" || resource === "tax_invoices") {
+    let q: any = db.from("moadian_invoices").select(
+      "id,fiscal_year_id,direction,tax_id,invoice_type,pattern,subject,status,issue_date_jalali,issue_date_gregorian,quarter_code,counterparty_name,tafsil_id,net_amount_rial,vat_amount_rial,gross_amount_rial,is_valid_for_tax",
+      { count: "exact" }
+    );
     if (resource === "purchase_invoices") q = q.eq("direction", "PURCHASE");
     if (fiscalYearId) q = q.eq("fiscal_year_id", fiscalYearId);
     if (from) q = q.gte("issue_date_gregorian", from);
     if (to) q = q.lte("issue_date_gregorian", to);
     if (fromJalali) q = q.gte("issue_date_jalali", fromJalali);
     if (toJalali) q = q.lte("issue_date_jalali", toJalali);
-    if (party) q = q.ilike("counterparty_name", `%${party.replace(/[%_]/g, "")}%`);
-    if (search) q = q.or(`counterparty_name.ilike.%${search.replace(/[%_,]/g, "")}% ,tax_id.ilike.%${search.replace(/[%_,]/g, "")}% ,subject.ilike.%${search.replace(/[%_,]/g, "")}%`);
+    if (party) q = q.ilike("counterparty_name", "%" + party.replace(/[%_]/g, "") + "%");
+    if (search) {
+      const clean = search.replace(/[%_,]/g, "");
+      q = q.or("counterparty_name.ilike.%" + clean + "%,tax_id.ilike.%" + clean + "%,subject.ilike.%" + clean + "%");
+    }
     if (status) q = q.eq("status", status);
     if (min !== null) q = q.gte("gross_amount_rial", min);
     if (max !== null) q = q.lte("gross_amount_rial", max);
-    const sort = ["issue_date_gregorian", "issue_date_jalali", "gross_amount_rial", "net_amount_rial", "counterparty_name"].includes(String(args.sort_by)) ? String(args.sort_by) : "issue_date_gregorian";
+    const sort = ["issue_date_gregorian", "issue_date_jalali", "gross_amount_rial", "net_amount_rial", "counterparty_name"].includes(String(args.sort_by))
+      ? String(args.sort_by) : "issue_date_gregorian";
     q = q.order(sort, { ascending: String(args.sort_direction ?? "desc") === "asc" }).range(offset, offset + limit - 1);
     const result = await q;
+    const rows = ensureNoError(result) ?? [];
+    return { resource, rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
+  }
+
+  if (resource === "inventory_stock") {
+    let q: any = db.from("inventory_stock").select("warehouse_id,product_id,quantity_on_hand", { count: "exact" });
+    if (args.warehouse_id) q = q.eq("warehouse_id", String(args.warehouse_id));
+    if (args.product_id) q = q.eq("product_id", String(args.product_id));
+    const result = await q.range(offset, offset + limit - 1);
     const rows = ensureNoError(result) ?? [];
     return { resource, rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
   }
@@ -235,8 +327,8 @@ async function executeTool(db: SupabaseClient, name: string, args: Record<string
       const pattern = `%${q.replace(/[%_]/g, "")}%`;
       const [accounts, parties, products] = await Promise.all([
         db.from("accounts").select("code,name_fa,category,requires_tafsil").eq("is_active", true).or(`name_fa.ilike.${pattern},code.eq.${q}`).limit(10),
-        db.from("tafsil_parties").select("tafsil_code,full_name,trade_name,party_type,national_id").eq("is_active", true).ilike("full_name", pattern).limit(10),
-        db.from("products").select("product_code,name_fa,unit_fa,is_vat_subject").eq("is_active", true).ilike("name_fa", pattern).limit(10),
+        db.from("tafsil_parties").select("id,tafsil_code,full_name,trade_name,party_type,national_id,economic_code,iban,metadata").eq("is_active", true).ilike("full_name", pattern).limit(10),
+        db.from("products").select("id,product_code,name_fa,unit_fa,is_vat_subject,sale_price_rial,vat_rate_pct,track_inventory").eq("is_active", true).ilike("name_fa", pattern).limit(10),
       ]);
       return { accounts: ensureNoError(accounts), parties: ensureNoError(parties), products: ensureNoError(products) };
     }
@@ -330,6 +422,92 @@ async function executeTool(db: SupabaseClient, name: string, args: Record<string
         p_lines: mappedLines,
       });
       return ensureNoError(result);
+    }
+    case "create_sales_document_draft": {
+      const documentType = String(args.document_type ?? "");
+      if (!["QUOTE", "INVOICE"].includes(documentType)) throw new Error("document_type باید QUOTE یا INVOICE باشد.");
+      const lines = Array.isArray(args.lines) ? args.lines as Array<Record<string, unknown>> : [];
+      if (lines.length < 1 || lines.length > 100) throw new Error("سند باید بین ۱ تا ۱۰۰ ردیف داشته باشد.");
+      const idempotency = String(args.idempotency_key ?? "").trim();
+      if (idempotency.length < 8) throw new Error("idempotency_key باید حداقل ۸ کاراکتر باشد.");
+      const mappedLines = lines.map((line) => {
+        const quantity = Number(line.quantity);
+        const price = Number(line.unit_price_rial);
+        const discount = Number(line.discount_rial ?? 0);
+        if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isSafeInteger(price) || price < 0 ||
+            !Number.isSafeInteger(discount) || discount < 0) {
+          throw new Error("تعداد باید مثبت و قیمت و تخفیف باید عدد صحیح ریالی نامنفی باشند.");
+        }
+        return {
+          product_id: line.product_id ? String(line.product_id) : null,
+          description: line.description ? String(line.description) : null,
+          unit_fa: line.unit_fa ? String(line.unit_fa) : "عدد",
+          quantity,
+          unit_price_rial: price,
+          discount_rial: discount,
+          is_vat_subject: line.is_vat_subject === undefined ? true : Boolean(line.is_vat_subject),
+          vat_rate_pct: line.vat_rate_pct === undefined ? null : Number(line.vat_rate_pct),
+        };
+      });
+      const result = await db.rpc("fn_agent_create_sales_document", {
+        p_fiscal_year_id: String(args.fiscal_year_id),
+        p_document_type: documentType,
+        p_party_id: String(args.party_id),
+        p_issue_date_gregorian: String(args.issue_date_gregorian),
+        p_issue_date_jalali: String(args.issue_date_jalali),
+        p_due_date_gregorian: args.due_date_gregorian ? String(args.due_date_gregorian) : null,
+        p_due_date_jalali: args.due_date_jalali ? String(args.due_date_jalali) : null,
+        p_valid_until_gregorian: args.valid_until_gregorian ? String(args.valid_until_gregorian) : null,
+        p_valid_until_jalali: args.valid_until_jalali ? String(args.valid_until_jalali) : null,
+        p_notes: args.notes ? String(args.notes) : null,
+        p_terms: args.terms ? String(args.terms) : null,
+        p_warehouse_id: args.warehouse_id ? String(args.warehouse_id) : null,
+        p_lines: mappedLines,
+        p_idempotency_key: idempotency,
+      });
+      return {
+        ...ensureNoError(result),
+        note_fa: "پیش‌نویس ثبت شد. این عامل اجازه صدور فاکتور، ثبت دریافت یا قطعی‌کردن سند حسابداری را ندارد؛ اقدام نهایی باید توسط کاربر مجاز انجام شود."
+      };
+    }
+    case "list_sales_documents": {
+      const { limit, offset } = boundedPage(args);
+      let q: any = db.from("sales_documents").select(
+        "id,fiscal_year_id,document_type,document_no,status,issue_date_gregorian,issue_date_jalali,party_id,party_name_snapshot,subtotal_rial,discount_rial,tax_rial,total_rial,paid_rial,balance_rial,voucher_id,created_by_actor",
+        { count: "exact" }
+      );
+      if (args.fiscal_year_id) q = q.eq("fiscal_year_id", String(args.fiscal_year_id));
+      if (args.document_type) q = q.eq("document_type", String(args.document_type));
+      if (args.status) q = q.eq("status", String(args.status));
+      if (args.party_id) q = q.eq("party_id", String(args.party_id));
+      const result = await q.order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+      const rows = ensureNoError(result) ?? [];
+      return { rows, page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count } };
+    }
+    case "get_sales_document": {
+      const documentId = String(args.document_id ?? "");
+      if (!documentId) throw new Error("document_id الزامی است.");
+      const result = await db.from("sales_documents")
+        .select("*,lines:sales_document_lines(*),payments:sales_document_payments(*)")
+        .eq("id", documentId).single();
+      return ensureNoError(result);
+    }
+    case "get_inventory_stock": {
+      const { limit, offset } = boundedPage(args);
+      let q: any = db.from("inventory_stock").select("warehouse_id,product_id,quantity_on_hand", { count: "exact" });
+      if (args.warehouse_id) q = q.eq("warehouse_id", String(args.warehouse_id));
+      if (args.product_id) q = q.eq("product_id", String(args.product_id));
+      const result = await q.range(offset, offset + limit - 1);
+      const rows = ensureNoError(result) ?? [];
+      const productIds = Array.from(new Set(rows.map((row: any) => String(row.product_id))));
+      const products = productIds.length
+        ? ensureNoError(await db.from("products").select("id,product_code,name_fa,unit_fa").in("id", productIds))
+        : [];
+      const byId = new Map((products as any[]).map((product) => [product.id, product]));
+      return {
+        rows: rows.map((row: any) => ({ ...row, product: byId.get(row.product_id) ?? null })),
+        page: { limit, offset, returned: rows.length, total: result.count ?? null, has_more: result.count == null ? rows.length === limit : offset + rows.length < result.count }
+      };
     }
     case "get_approval_status": {
       if (args.approval_id) {

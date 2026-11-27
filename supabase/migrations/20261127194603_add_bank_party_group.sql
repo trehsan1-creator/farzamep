@@ -1,0 +1,1 @@
+ALTER TYPE public.party_group ADD VALUE IF NOT EXISTS 'BANK';

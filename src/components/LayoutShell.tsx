@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard,
   BookOpenCheck,
+  ShoppingCart,
   FileSpreadsheet,
   Bot,
   CalendarCheck2,
@@ -46,6 +47,12 @@ const NAV_ITEMS: Array<{
     labelFa: 'اسناد و دفتر کل',
     shortDescFa: 'ثبت و بررسی اسناد',
     icon: BookOpenCheck,
+  },
+  {
+    id: 'sales',
+    labelFa: 'فروش و فاکتور',
+    shortDescFa: 'پیش‌فاکتور، فاکتور، وصول و انبار',
+    icon: ShoppingCart,
   },
   {
     id: 'excel_import',
@@ -140,7 +147,7 @@ export function LayoutShell({ activeView, onSelectView, children, onSignOut }: L
           </div>
         </div>
 
-        {/* 7 ERP Navigation Modules */}
+        {/* ERP Navigation Modules */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -198,7 +205,7 @@ export function LayoutShell({ activeView, onSelectView, children, onSignOut }: L
           <div className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-[#102333]/80 px-3.5 py-2.5 text-xs">
             <span className="flex items-center gap-2 font-medium text-[#F8FAFC]">
               <Database className="h-4 w-4 text-[#FF7A00]" />
-              <span>پایگاه داده آزمایشی</span>
+              <span>{isLiveSupabase ? 'پایگاه داده عملیاتی' : 'پایگاه داده'}</span>
             </span>
             <span className={`text-[11px] font-semibold ${isLiveSupabase ? 'text-[#10B981]' : 'text-[#F59E0B]'}`}>
               {isLiveSupabase ? 'متصل' : 'در حال اتصال'}

@@ -231,6 +231,7 @@ export interface ComplianceIssue {
 export type ActiveViewId =
   | 'dashboard'
   | 'vouchers'
+  | 'sales'
   | 'excel_import'
   | 'agent_queue'
   | 'year_end'
