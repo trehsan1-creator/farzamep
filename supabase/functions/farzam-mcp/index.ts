@@ -16,10 +16,10 @@ const toolDefinitions = [
     fiscal_year_id: { type: "string" }, date_from: { type: "string" }, date_to: { type: "string" },
     date_from_jalali: { type: "string" }, date_to_jalali: { type: "string" }, party_query: { type: "string" },
     search: { type: "string" }, status: { type: "string" }, min_amount_rial: { type: "integer" }, max_amount_rial: { type: "integer" },
-    limit: { type: "integer", minimum: 1, maximum: 500 }, offset: { type: "integer", minimum: 0 },
+    limit: { type: "integer", minimum: 1, maximum: 500 }, offset: { type: "integer", minimum: 0 }, warehouse_id: { type: "string" }, product_id: { type: "string" },
     sort_by: { type: "string" }, sort_direction: { type: "string", enum: ["asc", "desc"] }
   }, required: ["resource"] } },
-  { name: "propose_accounting_entries", description: "تبدیل کنترل‌شده و فقط‌خواندنی فاکتورهای خام فروش یا خرید به پیشنهاد سند حسابداری متوازن؛ هیچ رکوردی ایجاد نمی‌کند. هر پیشنهاد شامل حساب‌ها، طرف حساب، مبلغ، دلیل و هشدارهای بررسی است.", inputSchema: { type: "object", properties: {
+  { name: "propose_accounting_entries", description: "تبدیل کنترل‌شده و فقط‌خواندنی صورتحساب‌های خام واردشده از سامانه مؤدیان به پیشنهاد سند حسابداری متوازن؛ هیچ رکوردی ایجاد نمی‌کند. این ابزار از فاکتورهای تجاری داخلی جداست. هر پیشنهاد شامل حساب‌ها، طرف حساب، مبلغ، دلیل و هشدارهای بررسی است.", inputSchema: { type: "object", properties: {
     source_type: { type: "string", enum: ["sales_invoices", "purchase_invoices"] }, fiscal_year_id: { type: "string" },
     date_from_jalali: { type: "string" }, date_to_jalali: { type: "string" }, party_query: { type: "string" },
     limit: { type: "integer", minimum: 1, maximum: 100 }
