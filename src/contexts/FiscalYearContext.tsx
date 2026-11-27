@@ -654,7 +654,7 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
       }
 
       const sim = simulateYearEndClosing(activeFiscalYear.id, accounts, vouchers, fixedAssets, false);
-      const closingNo = Math.max(activeFiscalYear.last_voucher_no, ...vouchers.map((v) => v.voucher_no), 0) + 1;
+      const closingNo = Math.max(activeFiscalYear.last_voucher_no, ...vouchers.map((v) => v.voucher_no ?? 0), 0) + 1;
 
       const closingVoucher: Voucher = {
         id: `v-close-${activeFiscalYear.code}`,
