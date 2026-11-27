@@ -10,6 +10,7 @@ import type {
   TafsilParty,
   TrialBalanceRow,
   Voucher,
+  VoucherLine,
   YearEndSimulationResult,
 } from '../types/erp';
 
