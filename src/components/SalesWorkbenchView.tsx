@@ -397,7 +397,7 @@ export function SalesWorkbenchView() {
       p_warehouse_id: form.warehouse_id || null,
       p_lines: buildRpcLines(),
     };
-    const { p_document_type, ...updateArgs } = args;
+    const updateArgs = Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'p_document_type'));
     const result = editingDocument
       ? await supabase.rpc('fn_update_sales_document_draft', { p_document_id: editingDocument.id, ...updateArgs })
       : await supabase.rpc('fn_create_sales_document', {
