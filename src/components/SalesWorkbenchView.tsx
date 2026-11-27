@@ -182,7 +182,7 @@ export function SalesWorkbenchView() {
         .select('id,tafsil_code,full_name,national_id,economic_code,iban,metadata,party_type,is_active')
         .eq('party_type', 'CUSTOMER').eq('is_active', true).order('full_name'),
       supabase.from('products')
-        .select('id,product_code,name_fa,unit_fa,is_vat_subject,sale_price_rial,vat_rate_pct,track_inventory,is_active')
+        .select('id,product_code,name_fa,unit_fa,is_vat_subject,sale_price_rial,standard_cost_rial,vat_rate_pct,track_inventory,is_active')
         .eq('is_active', true).order('name_fa'),
       supabase.from('inventory_warehouses').select('id,code,name_fa').eq('is_active', true).order('name_fa'),
       supabase.from('sales_settings').select('*').eq('id', true).single(),
@@ -397,8 +397,9 @@ export function SalesWorkbenchView() {
       p_warehouse_id: form.warehouse_id || null,
       p_lines: buildRpcLines(),
     };
+    const { p_document_type, ...updateArgs } = args;
     const result = editingDocument
-      ? await supabase.rpc('fn_update_sales_document_draft', { p_document_id: editingDocument.id, ...args })
+      ? await supabase.rpc('fn_update_sales_document_draft', { p_document_id: editingDocument.id, ...updateArgs })
       : await supabase.rpc('fn_create_sales_document', {
           p_fiscal_year_id: activeFiscalYear.id,
           ...args,
