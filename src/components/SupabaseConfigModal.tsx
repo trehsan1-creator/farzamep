@@ -51,7 +51,7 @@ export function SupabaseConfigModal() {
               تنظیمات اتصال پایگاه داده Supabase PostgreSQL
             </h2>
             <p className="text-xs text-[#94A3B8]">
-              برای اتصال مستقیم به جداول و توابع RPC (مانند fn_create_voucher_atomic و اندپوینت Muse.ai MCP) مشخصات پروژه Supabase را وارد کنید. در صورت خالی بودن، سامانه در حالت آزمایشی کامل با داده‌های آتی فرزام اجرا می‌شود.
+              برای اتصال مستقیم به جداول و توابع RPC (مانند fn_create_voucher_draft_atomic و اندپوینت Muse.ai MCP) مشخصات پروژه Supabase را وارد کنید. در صورت خالی بودن، سامانه در حالت آزمایشی کامل با داده‌های آتی فرزام اجرا می‌شود.
             </p>
           </div>
           <button
