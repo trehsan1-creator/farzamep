@@ -19,6 +19,7 @@ The live Supabase project reports these applied versions:
 | 20261126181005 | multi_agent_mcp_credentials |
 | 20261127182701 | erp_voucher_write_path_hardening |
 | 20261127183045 | erp_fiscal_year_rls_lock_fix |
+| 20261127183226 | erp_voucher_rpc_and_approval_hardening |
 
 ## Repository state
 
