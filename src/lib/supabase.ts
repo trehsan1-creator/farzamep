@@ -306,7 +306,7 @@ export const supabaseGateway = {
         asset_code: row.asset_code ?? '',
         name_fa: row.description_fa ?? '',
         category_fa: row.category_fa ?? 'ثبت نشده',
-        art149_row: row.art149_row ?? '',
+        art149_row: row.art149_row ?? 'ثبت نشده',
         acquisition_jalali: row.in_service_jalali ?? '',
         cost_rial: Number(row.cost_rial ?? 0),
         accumulated_depr_opening_rial: null,
