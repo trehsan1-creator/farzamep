@@ -409,6 +409,13 @@ export const supabaseGateway = {
     return { data, error: error ? error.message : null };
   },
 
+  async finalizeVoucher(voucherId: string): Promise<{ data: unknown; error: string | null }> {
+    const client = getSupabaseClient();
+    if (!client) return { data: null, error: 'اتصال Supabase پیکربندی نشده است.' };
+    const { data, error } = await client.rpc('fn_finalize_voucher', { p_voucher_id: voucherId });
+    return { data, error: error ? error.message : null };
+  },
+
   async deleteDraftVoucher(voucherId: string): Promise<{ data: unknown; error: string | null }> {
     const client = getSupabaseClient();
     if (!client) return { data: null, error: 'اتصال Supabase پیکربندی نشده است.' };
