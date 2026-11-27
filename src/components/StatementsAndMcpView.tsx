@@ -567,7 +567,7 @@ export function StatementsAndMcpView() {
                       <th className="p-2.5">شرح دارایی</th>
                       <th className="p-2.5">ردیف ۱۴۹</th>
                       <th className="p-2.5">بهای تمام‌شده</th>
-                      <th className="p-2.5">نرخ دفتری / قانونی</th>
+                      <th className="p-2.5">عمر مفید دفتری / قانونی</th>
                       <th className="p-2.5">استهلاک دفتری</th>
                       <th className="p-2.5">استهلاک قانونی ۱۴۹</th>
                       <th className="p-2.5">مازاد غیرقابل‌قبول</th>
@@ -578,10 +578,10 @@ export function StatementsAndMcpView() {
                       <tr key={a.id} className={a.excess_disallowed_rial > 0 ? 'bg-[#ED2F42]/10' : ''}>
                         <td className="p-2.5 mono-ltr font-bold text-[#FF7A00]">{a.asset_code}</td>
                         <td className="p-2.5 font-semibold text-[#F8FAFC]">{a.name_fa}</td>
-                        <td className="p-2.5 mono-ltr">{a.art149_row}</td>
+                        <td className="p-2.5 mono-ltr">{a.art149_row || 'ثبت نشده'}</td>
                         <td className="p-2.5 num-ltr">{formatCurrency(a.cost_rial, currencyUnit)}</td>
                         <td className="p-2.5 num-ltr">
-                          {toPersianDigits(a.book_rate_pct)}% / {toPersianDigits(a.statutory_rate_pct)}%
+                          {a.book_useful_life_years == null && a.statutory_art149_life_years == null ? 'ثبت نشده' : `${a.book_useful_life_years == null ? '—' : toPersianDigits(a.book_useful_life_years)} سال / ${a.statutory_art149_life_years == null ? '—' : toPersianDigits(a.statutory_art149_life_years)} سال`}
                         </td>
                         <td className="p-2.5 num-ltr">{formatCurrency(a.book_annual_depr_rial, currencyUnit)}</td>
                         <td className="p-2.5 num-ltr text-[#10B981]">
