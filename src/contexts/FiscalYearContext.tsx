@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { toPersianDigits } from '../lib/persian';
 import type {
   Account,
   AgentApprovalRequest,
@@ -44,6 +45,7 @@ export interface SaveVoucherInput {
   gregorian_date: string;
   description_fa: string;
   reference_no?: string;
+  idempotency_key?: string;
   source?: Voucher['source'];
   compliance_flags?: string[];
   lines: Array<{
@@ -100,6 +102,7 @@ interface FiscalYearContextValue {
 
   // Mutations (all guarded by !isReadOnly)
   saveVoucherAtomic: (input: SaveVoucherInput) => Promise<{ ok: boolean; voucher?: Voucher; errorFa?: string }>;
+  finalizeVoucher: (voucherId: string) => Promise<{ ok: boolean; messageFa: string }>;
   deleteDraftVoucher: (voucherId: string) => Promise<{ ok: boolean; errorFa?: string }>;
   approveAgentDraft: (approvalId: string) => Promise<{ ok: boolean; messageFa: string }>;
   rejectAgentDraft: (approvalId: string, reasonFa: string) => Promise<{ ok: boolean; messageFa: string }>;
@@ -294,6 +297,9 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
       if (input.id && !existing) {
         return { ok: false, errorFa: 'سند انتخاب‌شده در پایگاه داده پیدا نشد؛ برای جلوگیری از ایجاد سند تکراری، ذخیره متوقف شد.' };
       }
+      if (existing && existing.fiscal_year_id !== activeFiscalYear.id) {
+        return { ok: false, errorFa: 'سند انتخاب‌شده متعلق به سال مالی دیگری است؛ ویرایش متوقف شد.' };
+      }
       if (existing && existing.status !== 'DRAFT') {
         return { ok: false, errorFa: 'اسناد قطعی یا ردشده قابل ویرایش نیستند.' };
       }
@@ -309,7 +315,7 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
       }));
 
       let savedId = existing?.id ?? ('v-' + activeFiscalYear.code + '-' + crypto.randomUUID());
-      let idempotencyKey = existing?.idempotency_key ?? null;
+      const idempotencyKey = existing?.idempotency_key ?? input.idempotency_key ?? crypto.randomUUID();
 
       if (isLiveSupabase) {
         const complianceFlags = input.compliance_flags ?? [];
@@ -327,7 +333,6 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
           });
           if (rpcRes.error) return { ok: false, errorFa: 'ویرایش در پایگاه داده انجام نشد: ' + rpcRes.error };
         } else {
-          idempotencyKey = crypto.randomUUID();
           const rpcRes = await supabaseGateway.createVoucherDraftAtomic({
             p_fiscal_year_id: activeFiscalYear.id,
             p_voucher_type: 'GENERAL',
@@ -388,6 +393,55 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
     [activeFiscalYear, allVouchers, isLiveSupabase, isReadOnly, supabaseCreds.source, syncError, syncFromSupabase, tafsilParties, userRole]
   );
 
+  const finalizeVoucher = useCallback(
+    async (voucherId: string): Promise<{ ok: boolean; messageFa: string }> => {
+      if (isReadOnly) return { ok: false, messageFa: 'سال مالی قفل شده است؛ قطعی‌سازی انجام نشد.' };
+      const target = allVouchers.find((voucher) => voucher.id === voucherId);
+      if (!target) return { ok: false, messageFa: 'سند یافت نشد.' };
+      if (target.status !== 'DRAFT') return { ok: false, messageFa: 'فقط پیش‌نویس قابل قطعی‌سازی است.' };
+      if (target.source === 'AI_AGENT') return { ok: false, messageFa: 'پیش‌نویس عامل فقط از صف تأیید انسانی قابل قطعی‌سازی است.' };
+      const debitTotal = target.lines.reduce((sum, line) => sum + line.debit_rial, 0);
+      const creditTotal = target.lines.reduce((sum, line) => sum + line.credit_rial, 0);
+      if (target.lines.length < 2 || debitTotal <= 0 || debitTotal !== creditTotal) {
+        return { ok: false, messageFa: 'سند باید حداقل دو ردیف متوازن با جمع غیرصفر داشته باشد.' };
+      }
+      if (supabaseCreds.source !== 'unconfigured' && !isLiveSupabase) {
+        return { ok: false, messageFa: syncError ?? 'همگام‌سازی پایگاه داده کامل نیست؛ قطعی‌سازی انجام نشد.' };
+      }
+
+      if (isLiveSupabase) {
+        const result = await supabaseGateway.finalizeVoucher(voucherId);
+        if (result.error) return { ok: false, messageFa: 'قطعی‌سازی در پایگاه داده انجام نشد: ' + result.error };
+        const response = result.data as { voucher_no?: number | null } | null;
+        const refreshed = await syncFromSupabase(activeFiscalYear.id);
+        if (!refreshed.ok) {
+          const nowIso = new Date().toISOString();
+          setAllVouchers((prev) => prev.map((voucher) => voucher.id === voucherId
+            ? { ...voucher, status: 'FINALIZED', voucher_no: response?.voucher_no ?? null, approved_by: userRole, approved_at: nowIso }
+            : voucher
+          ));
+          return { ok: true, messageFa: 'سند در پایگاه داده قطعی شد؛ تازه‌سازی اطلاعات با خطا مواجه شد و اتصال نیازمند بررسی است.' };
+        }
+        return {
+          ok: true,
+          messageFa: response?.voucher_no == null
+            ? 'سند با موفقیت قطعی شد.'
+            : 'سند شماره ' + toPersianDigits(response.voucher_no) + ' با موفقیت قطعی شد.',
+        };
+      }
+
+      const nextNo = Math.max(activeFiscalYear.last_voucher_no, ...vouchers.map((voucher) => voucher.voucher_no ?? 0), 0) + 1;
+      const nowIso = new Date().toISOString();
+      setAllVouchers((prev) => prev.map((voucher) => voucher.id === voucherId
+        ? { ...voucher, status: 'FINALIZED', voucher_no: nextNo, approved_by: userRole, approved_at: nowIso }
+        : voucher
+      ));
+      setFiscalYears((prev) => prev.map((fy) => fy.id === activeFiscalYear.id ? { ...fy, last_voucher_no: nextNo } : fy));
+      return { ok: true, messageFa: 'سند شماره ' + toPersianDigits(nextNo) + ' با موفقیت قطعی شد.' };
+    },
+    [activeFiscalYear, allVouchers, isLiveSupabase, isReadOnly, supabaseCreds.source, syncError, syncFromSupabase, userRole, vouchers]
+  );
+
   const deleteDraftVoucher = useCallback(
     async (voucherId: string): Promise<{ ok: boolean; errorFa?: string }> => {
       if (isReadOnly) return { ok: false, errorFa: 'سال مالی قفل شده است.' };
@@ -427,7 +481,7 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
       if (isReadOnly) return { ok: false, messageFa: 'سال مالی قفل شده است؛ امکان تأیید سند وجود ندارد.' };
       const request = allAgentApprovals.find((item) => item.id === approvalId);
       if (!request) return { ok: false, messageFa: 'درخواست تأیید یافت نشد.' };
-      if ((request.action_type && request.action_type !== 'APPROVE_DRAFT_VOUCHER') || !request.voucher_id) {
+      if (request.action_type !== 'APPROVE_DRAFT_VOUCHER' || !request.voucher_id) {
         return { ok: false, messageFa: 'این نوع درخواست هنوز مسیر تأیید عملیاتی ندارد و برای جلوگیری از تأیید صوری متوقف شد.' };
       }
       if (supabaseCreds.source !== 'unconfigured' && !isLiveSupabase) {
@@ -437,8 +491,8 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
       if (isLiveSupabase) {
         const result = await supabaseGateway.approveAgentDraft(approvalId);
         if (result.error) return { ok: false, messageFa: 'تأیید در پایگاه داده انجام نشد: ' + result.error };
-        void syncFromSupabase(activeFiscalYear.id);
-        return { ok: true, messageFa: 'پیشنهاد عامل در پایگاه داده تأیید و سند قطعی شد.' };
+        const refreshed = await syncFromSupabase(activeFiscalYear.id);
+        return { ok: true, messageFa: refreshed.ok ? 'پیشنهاد عامل در پایگاه داده تأیید و سند قطعی شد.' : 'سند قطعی شد، اما تازه‌سازی اطلاعات نیازمند بررسی است.' };
       }
 
       const nextNo = Math.max(activeFiscalYear.last_voucher_no, ...vouchers.map((voucher) => voucher.voucher_no ?? 0), 0) + 1;
@@ -470,8 +524,8 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
       if (isLiveSupabase) {
         const result = await supabaseGateway.rejectAgentDraft(approvalId, reason);
         if (result.error) return { ok: false, messageFa: 'رد درخواست در پایگاه داده انجام نشد: ' + result.error };
-        void syncFromSupabase(activeFiscalYear.id);
-        return { ok: true, messageFa: 'پیشنهاد عامل رد شد و سابقه آن حفظ گردید.' };
+        const refreshed = await syncFromSupabase(activeFiscalYear.id);
+        return { ok: true, messageFa: refreshed.ok ? 'پیشنهاد عامل رد شد و سابقه آن حفظ گردید.' : 'پیشنهاد رد شد، اما تازه‌سازی اطلاعات نیازمند بررسی است.' };
       }
 
       const nowIso = new Date().toISOString();
@@ -766,6 +820,7 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
     runYearEndSimulation,
     executeYearEndClosing,
     saveVoucherAtomic,
+    finalizeVoucher,
     deleteDraftVoucher,
     approveAgentDraft,
     rejectAgentDraft,
