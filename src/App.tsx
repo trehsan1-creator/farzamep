@@ -5,6 +5,7 @@ import { LayoutShell } from './components/LayoutShell';
 import { LoginView } from './components/LoginView';
 const DashboardView = lazy(() => import('./components/DashboardView').then((m) => ({ default: m.DashboardView })));
 const VoucherWorkbenchView = lazy(() => import('./components/VoucherWorkbenchView').then((m) => ({ default: m.VoucherWorkbenchView })));
+const SalesWorkbenchView = lazy(() => import('./components/SalesWorkbenchView').then((m) => ({ default: m.SalesWorkbenchView })));
 const ExcelImporterView = lazy(() => import('./components/ExcelImporterView').then((m) => ({ default: m.ExcelImporterView })));
 const AgentQueueView = lazy(() => import('./components/AgentQueueView').then((m) => ({ default: m.AgentQueueView })));
 const YearEndClosingView = lazy(() => import('./components/YearEndClosingView').then((m) => ({ default: m.YearEndClosingView })));
@@ -44,6 +45,7 @@ function AuthenticatedWorkspace({ onSignOut }: { onSignOut: () => Promise<void> 
       <Suspense fallback={<ViewLoading />}>
         {activeView === 'dashboard' && <DashboardView onNavigate={setActiveView} />}
         {activeView === 'vouchers' && <VoucherWorkbenchView />}
+        {activeView === 'sales' && <SalesWorkbenchView />}
         {activeView === 'excel_import' && <ExcelImporterView />}
         {activeView === 'agent_queue' && <AgentQueueView />}
         {activeView === 'year_end' && <YearEndClosingView onNavigate={setActiveView} />}
