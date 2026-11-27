@@ -208,8 +208,8 @@ export function VoucherWorkbenchView() {
     }
   };
 
-  const handleDeleteDraft = (voucherId: string) => {
-    const res = deleteDraftVoucher(voucherId);
+  const handleDeleteDraft = async (voucherId: string) => {
+    const res = await deleteDraftVoucher(voucherId);
     if (!res.ok) {
       setSaveFeedback({ ok: false, messageFa: res.errorFa ?? 'خطا در حذف سند' });
     } else {
