@@ -154,7 +154,7 @@ export function MasterDataView() {
                   <td className="p-2.5 mono-ltr text-[#10B981]">{p.moadian_commodity_id}</td>
                   <td className="p-2.5 text-[#94A3B8]">{p.unit_fa}</td>
                   <td className="p-2.5 num-ltr font-semibold text-[#F8FAFC]">
-                    {formatCurrency(p.standard_cost_rial, currencyUnit)}
+                    {p.standard_cost_rial == null ? 'ثبت نشده' : formatCurrency(p.standard_cost_rial, currencyUnit)}
                   </td>
                 </tr>
               ))}
