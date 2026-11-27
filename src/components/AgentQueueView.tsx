@@ -134,7 +134,7 @@ export function AgentQueueView() {
                     </div>
                     <h2 className="text-base font-extrabold text-[#F8FAFC]">
                       {voucher
-                        ? `سند پیشنویس شماره ${toPersianDigits(voucher.voucher_no)} — ${voucher.description_fa}`
+                        ? `سند پیشنویس شماره ${toPersianDigits(voucher.voucher_no ?? 0)} — ${voucher.description_fa}`
                         : `درخواست ${req.id}`}
                     </h2>
                     <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#94A3B8]">
