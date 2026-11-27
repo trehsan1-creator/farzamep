@@ -76,6 +76,7 @@ interface FiscalYearContextValue {
   // Connection state
   supabaseCreds: SupabaseCredentials;
   isLiveSupabase: boolean;
+  syncError: string | null;
   connectionModalOpen: boolean;
   setConnectionModalOpen: (open: boolean) => void;
   configureSupabase: (url: string, anonKey: string) => Promise<{ ok: boolean; messageFa: string }>;
@@ -99,7 +100,7 @@ interface FiscalYearContextValue {
 
   // Mutations (all guarded by !isReadOnly)
   saveVoucherAtomic: (input: SaveVoucherInput) => Promise<{ ok: boolean; voucher?: Voucher; errorFa?: string }>;
-  deleteDraftVoucher: (voucherId: string) => { ok: boolean; errorFa?: string };
+  deleteDraftVoucher: (voucherId: string) => Promise<{ ok: boolean; errorFa?: string }>;
   approveAgentDraft: (approvalId: string) => Promise<{ ok: boolean; messageFa: string }>;
   rejectAgentDraft: (approvalId: string, reasonFa: string) => Promise<{ ok: boolean; messageFa: string }>;
   commitExcelImport: (parsed: ParsedExcelResult) => Promise<{ ok: boolean; importedCount: number; messageFa: string }>;
@@ -115,6 +116,7 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
 
   const [supabaseCreds, setSupabaseCreds] = useState<SupabaseCredentials>(() => getSupabaseCredentials());
   const [isLiveSupabase, setIsLiveSupabase] = useState<boolean>(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [connectionModalOpen, setConnectionModalOpen] = useState<boolean>(false);
 
   // Master & transactional collections (all scoped by fiscal_year_id via selectors)
@@ -136,61 +138,61 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
 
   // Attempt live sync whenever Supabase credentials are configured
   const syncFromSupabase = useCallback(
-    async (fyId: string) => {
+    async (fyId: string): Promise<{ ok: boolean; messageFa: string }> => {
       const creds = getSupabaseCredentials();
       setSupabaseCreds(creds);
       if (creds.source === 'unconfigured') {
         setIsLiveSupabase(false);
-        return;
+        setSyncError(null);
+        return { ok: false, messageFa: 'اتصال Supabase پیکربندی نشده است.' };
       }
+
       const ping = await supabaseGateway.testConnection();
       if (!ping.ok) {
         setIsLiveSupabase(false);
-        return;
+        setSyncError(ping.messageFa);
+        return { ok: false, messageFa: ping.messageFa };
       }
-      setIsLiveSupabase(true);
 
-      const [remoteFys, remoteAccounts, scoped] = await Promise.all([
+      const [remoteFys, remoteAccounts] = await Promise.all([
         supabaseGateway.fetchFiscalYears(),
         supabaseGateway.fetchAccounts(),
-        supabaseGateway.fetchScopedData(fyId),
       ]);
+      if (!remoteFys?.length || !remoteAccounts?.length) {
+        const messageFa = 'اتصال برقرار است، اما دریافت کامل سال‌های مالی یا سرفصل‌های حسابداری ناموفق بود.';
+        setIsLiveSupabase(false);
+        setSyncError(messageFa);
+        return { ok: false, messageFa };
+      }
 
-      if (remoteFys?.length) {
-        setFiscalYears(remoteFys);
-        setActiveFiscalYearId((current) =>
-          remoteFys.some((fy) => fy.id === current)
-            ? current
-            : remoteFys.find((fy) => fy.code === '1405')?.id ??
-              remoteFys.find((fy) => !fy.is_closed)?.id ??
-              remoteFys[0].id
-        );
+      const targetFy =
+        remoteFys.find((fy) => fy.id === fyId) ??
+        remoteFys.find((fy) => fy.code === '1405') ??
+        remoteFys.find((fy) => !fy.is_closed) ??
+        remoteFys[0];
+
+      setFiscalYears(remoteFys);
+      setAccounts(remoteAccounts);
+      setActiveFiscalYearId(targetFy.id);
+
+      const scoped = await supabaseGateway.fetchScopedData(targetFy.id);
+      if (!scoped) {
+        const messageFa = 'اتصال برقرار است، اما حداقل یکی از مجموعه‌داده‌های مالی کامل بارگذاری نشد؛ حالت ثبت اطلاعات غیرفعال شد.';
+        setIsLiveSupabase(false);
+        setSyncError(messageFa);
+        return { ok: false, messageFa };
       }
-      if (remoteAccounts) setAccounts(remoteAccounts);
-      if (scoped) {
-        setAllVouchers((prev) => [
-          ...prev.filter((v) => v.fiscal_year_id !== fyId),
-          ...scoped.vouchers,
-        ]);
-        setAllBankTransactions((prev) => [
-          ...prev.filter((b) => b.fiscal_year_id !== fyId),
-          ...scoped.bankTransactions,
-        ]);
-        setAllMoadianInvoices((prev) => [
-          ...prev.filter((m) => m.fiscal_year_id !== fyId),
-          ...scoped.moadianInvoices,
-        ]);
-        setAllFixedAssets((prev) => [
-          ...prev.filter((a) => a.fiscal_year_id !== fyId),
-          ...scoped.fixedAssets,
-        ]);
-        setAllAgentApprovals((prev) => [
-          ...prev.filter((a) => a.fiscal_year_id !== fyId),
-          ...scoped.agentApprovals,
-        ]);
-        setTafsilParties(scoped.tafsilParties);
-        setProducts(scoped.products);
-      }
+
+      setAllVouchers((prev) => [...prev.filter((v) => v.fiscal_year_id !== targetFy.id), ...scoped.vouchers]);
+      setAllBankTransactions((prev) => [...prev.filter((b) => b.fiscal_year_id !== targetFy.id), ...scoped.bankTransactions]);
+      setAllMoadianInvoices((prev) => [...prev.filter((m) => m.fiscal_year_id !== targetFy.id), ...scoped.moadianInvoices]);
+      setAllFixedAssets((prev) => [...prev.filter((a) => a.fiscal_year_id !== targetFy.id), ...scoped.fixedAssets]);
+      setAllAgentApprovals((prev) => [...prev.filter((a) => a.fiscal_year_id !== targetFy.id), ...scoped.agentApprovals]);
+      setTafsilParties(scoped.tafsilParties);
+      setProducts(scoped.products);
+      setIsLiveSupabase(true);
+      setSyncError(null);
+      return { ok: true, messageFa: 'اتصال و همگام‌سازی کامل اطلاعات مالی با موفقیت انجام شد.' };
     },
     []
   );
@@ -204,7 +206,7 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
     () =>
       allVouchers
         .filter((v) => v.fiscal_year_id === activeFiscalYear.id)
-        .sort((a, b) => b.voucher_no - a.voucher_no),
+        .sort((a, b) => (b.voucher_no ?? 0) - (a.voucher_no ?? 0)),
     [allVouchers, activeFiscalYear.id]
   );
 
@@ -242,22 +244,17 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
       saveSupabaseCredentials(url, anonKey);
       const nextCreds = getSupabaseCredentials();
       setSupabaseCreds(nextCreds);
-      const ping = await supabaseGateway.testConnection();
-      if (ping.ok) {
-        setIsLiveSupabase(true);
-        await syncFromSupabase(activeFiscalYear.id);
-        return { ok: true, messageFa: ping.messageFa };
-      }
-      setIsLiveSupabase(false);
-      return { ok: false, messageFa: ping.messageFa };
+      const result = await syncFromSupabase('');
+      return { ok: result.ok, messageFa: result.messageFa };
     },
-    [activeFiscalYear.id, syncFromSupabase]
+    [syncFromSupabase]
   );
 
   const disconnectSupabase = useCallback(() => {
     clearSupabaseCredentials();
     setSupabaseCreds(getSupabaseCredentials());
     setIsLiveSupabase(false);
+    setSyncError(null);
   }, []);
 
   const getTrialBalance = useCallback(
@@ -270,177 +267,229 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
       if (isReadOnly) {
         return { ok: false, errorFa: 'سال مالی قفل شده است — امکان ثبت یا ویرایش سند وجود ندارد.' };
       }
+      if (supabaseCreds.source !== 'unconfigured' && !isLiveSupabase) {
+        return { ok: false, errorFa: syncError ?? 'اتصال تنظیم شده اما همگام‌سازی کامل نیست؛ ذخیره غیرفعال است.' };
+      }
+      if (input.lines.length < 2) return { ok: false, errorFa: 'سند باید حداقل دو ردیف داشته باشد.' };
 
-      const debitTotal = input.lines.reduce((s, l) => s + Math.trunc(l.debit_rial), 0);
-      const creditTotal = input.lines.reduce((s, l) => s + Math.trunc(l.credit_rial), 0);
-      if (debitTotal <= 0 || debitTotal !== creditTotal) {
-        return {
-          ok: false,
-          errorFa: 'سند حسابداری تراز نیست؛ جمع بدهکار و بستانکار باید دقیقاً برابر و بزرگتر از صفر باشد.',
-        };
+      const invalidLine = input.lines.some((line) =>
+        !Number.isSafeInteger(line.debit_rial) ||
+        !Number.isSafeInteger(line.credit_rial) ||
+        line.debit_rial < 0 ||
+        line.credit_rial < 0 ||
+        (line.debit_rial === 0 && line.credit_rial === 0) ||
+        (line.debit_rial > 0 && line.credit_rial > 0)
+      );
+      if (invalidLine) {
+        return { ok: false, errorFa: 'هر ردیف باید مبلغ صحیح و غیرمنفی داشته باشد و فقط در یک سمت بدهکار یا بستانکار ثبت شود.' };
       }
 
+      const debitTotal = input.lines.reduce((sum, line) => sum + line.debit_rial, 0);
+      const creditTotal = input.lines.reduce((sum, line) => sum + line.credit_rial, 0);
+      if (debitTotal <= 0 || debitTotal !== creditTotal) {
+        return { ok: false, errorFa: 'سند حسابداری تراز نیست؛ جمع بدهکار و بستانکار باید دقیقاً برابر و بزرگتر از صفر باشد.' };
+      }
+
+      const existing = input.id ? allVouchers.find((voucher) => voucher.id === input.id) : undefined;
+      if (input.id && !existing) {
+        return { ok: false, errorFa: 'سند انتخاب‌شده در پایگاه داده پیدا نشد؛ برای جلوگیری از ایجاد سند تکراری، ذخیره متوقف شد.' };
+      }
+      if (existing && existing.status !== 'DRAFT') {
+        return { ok: false, errorFa: 'اسناد قطعی یا ردشده قابل ویرایش نیستند.' };
+      }
+
+      const payloadLines = input.lines.map((line) => ({
+        account_code: line.account_code,
+        tafsil_id: line.tafsil_id,
+        tafsil_code: tafsilParties.find((party) => party.id === line.tafsil_id)?.code ?? null,
+        line_description: line.description_fa,
+        debit_rial: line.debit_rial,
+        credit_rial: line.credit_rial,
+        moadian_tax_id: line.moadian_tax_id ?? null,
+      }));
+
+      let savedId = existing?.id ?? ('v-' + activeFiscalYear.code + '-' + crypto.randomUUID());
+      let idempotencyKey = existing?.idempotency_key ?? null;
+
       if (isLiveSupabase) {
-        const rpcRes = await supabaseGateway.createVoucherAtomic({
-          p_fiscal_year_id: activeFiscalYear.id,
-          p_jalali_date: input.jalali_date,
-          p_gregorian_date: input.gregorian_date,
-          p_description_fa: input.description_fa,
-          p_source: input.source ?? 'MANUAL',
-          p_reference_no: input.reference_no ?? null,
-          p_lines: input.lines.map((l) => ({
-            account_id: l.account_id,
-            account_code: l.account_code,
-            tafsil_id: l.tafsil_id,
-            description_fa: l.description_fa,
-            debit_rial: Math.trunc(l.debit_rial),
-            credit_rial: Math.trunc(l.credit_rial),
-            moadian_tax_id: l.moadian_tax_id ?? null,
-          })),
-        });
-        if (rpcRes.error) {
-          return { ok: false, errorFa: `خطای تراکنش اتمیک Supabase: ${rpcRes.error}` };
+        const complianceFlags = input.compliance_flags ?? [];
+        const complianceStatus = complianceFlags.length ? 'WARNING' : 'UNCHECKED';
+        if (existing) {
+          const rpcRes = await supabaseGateway.updateDraftVoucher({
+            p_voucher_id: existing.id,
+            p_voucher_date_gregorian: input.gregorian_date,
+            p_voucher_date_jalali: input.jalali_date,
+            p_description: input.description_fa,
+            p_reference_no: input.reference_no ?? existing.reference_no ?? null,
+            p_compliance_status: complianceStatus,
+            p_compliance_flags: complianceFlags,
+            p_lines: payloadLines,
+          });
+          if (rpcRes.error) return { ok: false, errorFa: 'ویرایش در پایگاه داده انجام نشد: ' + rpcRes.error };
+        } else {
+          idempotencyKey = crypto.randomUUID();
+          const rpcRes = await supabaseGateway.createVoucherDraftAtomic({
+            p_fiscal_year_id: activeFiscalYear.id,
+            p_voucher_type: 'GENERAL',
+            p_voucher_date_gregorian: input.gregorian_date,
+            p_voucher_date_jalali: input.jalali_date,
+            p_description: input.description_fa,
+            p_reference_no: input.reference_no ?? null,
+            p_idempotency_key: idempotencyKey,
+            p_compliance_status: complianceStatus,
+            p_compliance_flags: complianceFlags,
+            p_lines: payloadLines,
+          });
+          if (rpcRes.error) return { ok: false, errorFa: 'ثبت در پایگاه داده انجام نشد: ' + rpcRes.error };
+          const response = rpcRes.data as { voucher_id?: string } | null;
+          if (!response?.voucher_id) {
+            return { ok: false, errorFa: 'پایگاه داده پاسخ معتبر برای شناسه سند برنگرداند؛ وضعیت ثبت را بررسی کنید.' };
+          }
+          savedId = response.voucher_id;
         }
       }
 
-      const existing = input.id ? allVouchers.find((v) => v.id === input.id) : undefined;
-      if (existing && existing.status === 'FINALIZED') {
-        return { ok: false, errorFa: 'اسناد قطعی‌شده (FINALIZED) قابل ویرایش نیستند.' };
-      }
-
-      const voucherId = existing?.id ?? `v-${activeFiscalYear.code}-${Date.now()}`;
-      const nextNo =
-        existing?.voucher_no ??
-        Math.max(activeFiscalYear.last_voucher_no, ...vouchers.map((v) => v.voucher_no), 0) + 1;
-
-      const builtLines: VoucherLine[] = input.lines.map((l, idx) => ({
-        id: `${voucherId}-l-${idx + 1}`,
-        voucher_id: voucherId,
-        line_no: idx + 1,
-        account_id: l.account_id,
-        account_code: l.account_code,
-        tafsil_id: l.tafsil_id,
-        tafsil_name:
-          l.tafsil_name ??
-          tafsilParties.find((t) => t.id === l.tafsil_id)?.name_fa ??
-          null,
-        description_fa: l.description_fa,
-        debit_rial: Math.trunc(l.debit_rial),
-        credit_rial: Math.trunc(l.credit_rial),
-        moadian_tax_id: l.moadian_tax_id ?? null,
-      }));
-
       const savedVoucher: Voucher = {
-        id: voucherId,
+        id: savedId,
         fiscal_year_id: activeFiscalYear.id,
-        voucher_no: nextNo,
+        voucher_no: existing?.voucher_no ?? null,
         jalali_date: input.jalali_date,
         gregorian_date: input.gregorian_date,
         description_fa: input.description_fa,
         status: 'DRAFT',
         source: existing?.source ?? input.source ?? 'MANUAL',
-        reference_no: input.reference_no ?? existing?.reference_no ?? `DOC-${nextNo}`,
+        idempotency_key: idempotencyKey,
+        reference_no: input.reference_no ?? existing?.reference_no ?? null,
         created_by: existing?.created_by ?? userRole,
-        compliance_flags: input.compliance_flags ?? [],
-        lines: builtLines,
+        approved_by: existing?.approved_by ?? null,
+        approved_at: existing?.approved_at ?? null,
+        compliance_flags: input.compliance_flags ?? existing?.compliance_flags ?? [],
+        lines: input.lines.map((line, index) => ({
+          id: existing?.lines[index]?.id ?? (savedId + '-l-' + (index + 1)),
+          voucher_id: savedId,
+          line_no: index + 1,
+          account_id: line.account_id,
+          account_code: line.account_code,
+          tafsil_id: line.tafsil_id,
+          tafsil_name: line.tafsil_name ?? tafsilParties.find((party) => party.id === line.tafsil_id)?.name_fa ?? null,
+          description_fa: line.description_fa,
+          debit_rial: line.debit_rial,
+          credit_rial: line.credit_rial,
+          moadian_tax_id: line.moadian_tax_id ?? null,
+        })),
       };
 
       setAllVouchers((prev) =>
-        existing ? prev.map((v) => (v.id === voucherId ? savedVoucher : v)) : [savedVoucher, ...prev]
+        existing ? prev.map((voucher) => voucher.id === savedId ? savedVoucher : voucher) : [savedVoucher, ...prev]
       );
-
-      if (!existing) {
-        setFiscalYears((prev) =>
-          prev.map((fy) =>
-            fy.id === activeFiscalYear.id ? { ...fy, last_voucher_no: nextNo } : fy
-          )
-        );
-      }
-
+      if (isLiveSupabase) void syncFromSupabase(activeFiscalYear.id);
       return { ok: true, voucher: savedVoucher };
     },
-    [activeFiscalYear, allVouchers, isLiveSupabase, isReadOnly, tafsilParties, userRole, vouchers]
+    [activeFiscalYear, allVouchers, isLiveSupabase, isReadOnly, supabaseCreds.source, syncError, syncFromSupabase, tafsilParties, userRole]
   );
 
   const deleteDraftVoucher = useCallback(
-    (voucherId: string) => {
-      if (isReadOnly) {
-        return { ok: false, errorFa: 'سال مالی قفل شده است.' };
+    async (voucherId: string): Promise<{ ok: boolean; errorFa?: string }> => {
+      if (isReadOnly) return { ok: false, errorFa: 'سال مالی قفل شده است.' };
+      if (supabaseCreds.source !== 'unconfigured' && !isLiveSupabase) {
+        return { ok: false, errorFa: syncError ?? 'همگام‌سازی پایگاه داده کامل نیست؛ حذف انجام نشد.' };
       }
-      const target = allVouchers.find((v) => v.id === voucherId);
+      const target = allVouchers.find((voucher) => voucher.id === voucherId);
       if (!target) return { ok: false, errorFa: 'سند یافت نشد.' };
-      if (target.status !== 'DRAFT') {
-        return { ok: false, errorFa: 'تنها اسناد پیشنویس (DRAFT) قابل حذف هستند.' };
+      if (target.status !== 'DRAFT') return { ok: false, errorFa: 'تنها اسناد پیش‌نویس (DRAFT) قابل حذف هستند.' };
+
+      if (isLiveSupabase) {
+        const result = await supabaseGateway.deleteDraftVoucher(voucherId);
+        if (result.error) return { ok: false, errorFa: 'حذف در پایگاه داده انجام نشد: ' + result.error };
+        setAllAgentApprovals((prev) => prev.map((request) =>
+          request.voucher_id === voucherId && request.status === 'PENDING_HUMAN_APPROVAL'
+            ? { ...request, status: 'REJECTED', rejection_reason: 'پیش‌نویس توسط کاربر حذف شد', reviewed_at: new Date().toISOString() }
+            : request
+        ));
+        setAllVouchers((prev) => prev.filter((voucher) => voucher.id !== voucherId));
+        void syncFromSupabase(activeFiscalYear.id);
+        return { ok: true };
       }
-      setAllVouchers((prev) => prev.filter((v) => v.id !== voucherId));
-      setAllAgentApprovals((prev) => prev.filter((a) => a.voucher_id !== voucherId));
+
+      setAllVouchers((prev) => prev.filter((voucher) => voucher.id !== voucherId));
+      setAllAgentApprovals((prev) => prev.map((request) =>
+        request.voucher_id === voucherId && request.status === 'PENDING_HUMAN_APPROVAL'
+          ? { ...request, status: 'REJECTED', rejection_reason: 'پیش‌نویس توسط کاربر حذف شد', reviewed_at: new Date().toISOString() }
+          : request
+      ));
       return { ok: true };
     },
-    [allVouchers, isReadOnly]
+    [activeFiscalYear.id, allVouchers, isLiveSupabase, isReadOnly, supabaseCreds.source, syncError, syncFromSupabase]
   );
 
   const approveAgentDraft = useCallback(
     async (approvalId: string) => {
-      if (isReadOnly) {
-        return { ok: false, messageFa: 'سال مالی قفل شده است؛ امکان تأیید سند وجود ندارد.' };
+      if (isReadOnly) return { ok: false, messageFa: 'سال مالی قفل شده است؛ امکان تأیید سند وجود ندارد.' };
+      const request = allAgentApprovals.find((item) => item.id === approvalId);
+      if (!request) return { ok: false, messageFa: 'درخواست تأیید یافت نشد.' };
+      if ((request.action_type && request.action_type !== 'APPROVE_DRAFT_VOUCHER') || !request.voucher_id) {
+        return { ok: false, messageFa: 'این نوع درخواست هنوز مسیر تأیید عملیاتی ندارد و برای جلوگیری از تأیید صوری متوقف شد.' };
       }
-      const req = allAgentApprovals.find((a) => a.id === approvalId);
-      if (!req) return { ok: false, messageFa: 'درخواست تأیید یافت نشد.' };
+      if (supabaseCreds.source !== 'unconfigured' && !isLiveSupabase) {
+        return { ok: false, messageFa: syncError ?? 'همگام‌سازی پایگاه داده کامل نیست؛ تأیید انجام نشد.' };
+      }
 
+      if (isLiveSupabase) {
+        const result = await supabaseGateway.approveAgentDraft(approvalId);
+        if (result.error) return { ok: false, messageFa: 'تأیید در پایگاه داده انجام نشد: ' + result.error };
+        void syncFromSupabase(activeFiscalYear.id);
+        return { ok: true, messageFa: 'پیشنهاد عامل در پایگاه داده تأیید و سند قطعی شد.' };
+      }
+
+      const nextNo = Math.max(activeFiscalYear.last_voucher_no, ...vouchers.map((voucher) => voucher.voucher_no ?? 0), 0) + 1;
       const nowIso = new Date().toISOString();
-      setAllAgentApprovals((prev) =>
-        prev.map((a) =>
-          a.id === approvalId
-            ? { ...a, status: 'APPROVED', reviewed_by: userRole, reviewed_at: nowIso }
-            : a
-        )
-      );
-      setAllVouchers((prev) =>
-        prev.map((v) =>
-          v.id === req.voucher_id
-            ? { ...v, status: 'FINALIZED', approved_by: userRole, approved_at: nowIso }
-            : v
-        )
-      );
-
+      setAllAgentApprovals((prev) => prev.map((item) =>
+        item.id === approvalId ? { ...item, status: 'APPROVED', reviewed_by: userRole, reviewed_at: nowIso } : item
+      ));
+      setAllVouchers((prev) => prev.map((voucher) =>
+        voucher.id === request.voucher_id
+          ? { ...voucher, status: 'FINALIZED', voucher_no: nextNo, approved_by: userRole, approved_at: nowIso }
+          : voucher
+      ));
+      setFiscalYears((prev) => prev.map((fy) => fy.id === activeFiscalYear.id ? { ...fy, last_voucher_no: nextNo } : fy));
       return { ok: true, messageFa: 'پیشنویس هوش مصنوعی توسط کاربر انسانی تأیید و قطعی‌سازی شد.' };
     },
-    [allAgentApprovals, isReadOnly, userRole]
+    [activeFiscalYear, allAgentApprovals, isLiveSupabase, isReadOnly, supabaseCreds.source, syncError, syncFromSupabase, userRole, vouchers]
   );
 
   const rejectAgentDraft = useCallback(
     async (approvalId: string, reasonFa: string) => {
-      if (isReadOnly) {
-        return { ok: false, messageFa: 'سال مالی قفل شده است.' };
+      if (isReadOnly) return { ok: false, messageFa: 'سال مالی قفل شده است.' };
+      const request = allAgentApprovals.find((item) => item.id === approvalId);
+      if (!request) return { ok: false, messageFa: 'درخواست تأیید یافت نشد.' };
+      if (supabaseCreds.source !== 'unconfigured' && !isLiveSupabase) {
+        return { ok: false, messageFa: syncError ?? 'همگام‌سازی پایگاه داده کامل نیست؛ رد درخواست انجام نشد.' };
       }
-      const req = allAgentApprovals.find((a) => a.id === approvalId);
-      if (!req) return { ok: false, messageFa: 'درخواست تأیید یافت نشد.' };
+      const reason = reasonFa.trim() || 'رد شده توسط مدیر مالی';
+
+      if (isLiveSupabase) {
+        const result = await supabaseGateway.rejectAgentDraft(approvalId, reason);
+        if (result.error) return { ok: false, messageFa: 'رد درخواست در پایگاه داده انجام نشد: ' + result.error };
+        void syncFromSupabase(activeFiscalYear.id);
+        return { ok: true, messageFa: 'پیشنهاد عامل رد شد و سابقه آن حفظ گردید.' };
+      }
 
       const nowIso = new Date().toISOString();
-      setAllAgentApprovals((prev) =>
-        prev.map((a) =>
-          a.id === approvalId
-            ? {
-                ...a,
-                status: 'REJECTED',
-                reviewed_by: userRole,
-                reviewed_at: nowIso,
-                rejection_reason: reasonFa || 'رد شده توسط مدیر مالی',
-              }
-            : a
-        )
-      );
-      setAllVouchers((prev) =>
-        prev.map((v) =>
-          v.id === req.voucher_id
-            ? { ...v, status: 'REJECTED', rejection_reason: reasonFa || 'رد شده توسط مدیر مالی' }
-            : v
-        )
-      );
-
+      setAllAgentApprovals((prev) => prev.map((item) =>
+        item.id === approvalId
+          ? { ...item, status: 'REJECTED', reviewed_by: userRole, reviewed_at: nowIso, rejection_reason: reason }
+          : item
+      ));
+      if (request.voucher_id) {
+        setAllVouchers((prev) => prev.map((voucher) =>
+          voucher.id === request.voucher_id
+            ? { ...voucher, status: 'REJECTED', rejection_reason: reason }
+            : voucher
+        ));
+      }
       return { ok: true, messageFa: 'پیشنویس هوش مصنوعی رد و از دفاتر خارج شد.' };
     },
-    [allAgentApprovals, isReadOnly, userRole]
+    [activeFiscalYear.id, allAgentApprovals, isLiveSupabase, isReadOnly, supabaseCreds.source, syncError, syncFromSupabase, userRole]
   );
 
   const commitExcelImport = useCallback(
@@ -699,6 +748,7 @@ export function FiscalYearProvider({ children, userRole: initialUserRole = 'کا
     userRole,
     supabaseCreds,
     isLiveSupabase,
+    syncError,
     connectionModalOpen,
     setConnectionModalOpen,
     configureSupabase,
