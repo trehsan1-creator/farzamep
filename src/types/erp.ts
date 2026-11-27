@@ -1,6 +1,6 @@
 export type CurrencyUnit = 'RIAL' | 'TOMAN';
 
-export type AccountCategory = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+export type AccountCategory = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE' | 'COGS' | 'CLOSING_SUMMARY';
 export type NormalBalance = 'DEBIT' | 'CREDIT';
 
 export interface FiscalYear {
@@ -47,10 +47,11 @@ export interface Product {
   id: string;
   sku: string;
   name_fa: string;
-  moadian_commodity_id: string;
+  moadian_commodity_id: string | null;
   unit_fa: string;
-  vat_rate_pct: number;
-  standard_cost_rial: number;
+  vat_rate_pct: number | null;
+  standard_cost_rial: number | null;
+  is_vat_subject: boolean;
   group_guid?: string | null;
   group_label?: string | null;
   created_jalali?: string | null;
@@ -65,14 +66,21 @@ export interface FixedAsset {
   art149_row: string;
   acquisition_jalali: string;
   cost_rial: number;
-  accumulated_depr_opening_rial: number;
-  book_rate_pct: number;
-  statutory_rate_pct: number;
-  book_method: 'STRAIGHT_LINE' | 'DECLINING_BALANCE';
-  statutory_method: 'STRAIGHT_LINE' | 'DECLINING_BALANCE';
+  accumulated_depr_opening_rial: number | null;
+  book_rate_pct: number | null;
+  statutory_rate_pct: number | null;
+  book_method: 'STRAIGHT_LINE' | 'DECLINING_BALANCE' | null;
+  statutory_method: 'STRAIGHT_LINE' | 'DECLINING_BALANCE' | null;
   book_annual_depr_rial: number;
   statutory_annual_depr_rial: number;
   excess_disallowed_rial: number;
+  moadian_tax_id?: string | null;
+  in_service_date?: string | null;
+  book_useful_life_years?: number | null;
+  statutory_art149_life_years?: number | null;
+  months_active_in_fy?: number | null;
+  quantity?: number | null;
+  capitalized_vat_rial?: number | null;
 }
 
 export type VoucherStatus = 'DRAFT' | 'FINALIZED' | 'REJECTED';
@@ -90,12 +98,13 @@ export interface VoucherLine {
   debit_rial: number;
   credit_rial: number;
   moadian_tax_id?: string | null;
+  bank_trace_no?: string | null;
 }
 
 export interface Voucher {
   id: string;
   fiscal_year_id: string;
-  voucher_no: number;
+  voucher_no: number | null;
   jalali_date: string;
   gregorian_date: string;
   description_fa: string;
@@ -103,7 +112,7 @@ export interface Voucher {
   source: VoucherSource;
   idempotency_key?: string | null;
   reference_no?: string | null;
-  created_by: string;
+  created_by: string | null;
   approved_by?: string | null;
   approved_at?: string | null;
   rejection_reason?: string | null;
@@ -115,7 +124,7 @@ export interface BankTransaction {
   id: string;
   fiscal_year_id: string;
   bank_name: string;
-  account_iban: string;
+  bank_account_no: string | null;
   quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   jalali_date: string;
   tracking_no: string;
@@ -123,18 +132,18 @@ export interface BankTransaction {
   deposit_rial: number;
   withdrawal_rial: number;
   balance_rial: number;
-  continuity_verified: boolean;
+  continuity_verified: boolean | null;
   suggested_account_code: string;
   is_documented: boolean;
   linked_voucher_id?: string | null;
 }
 
-export type MoadianStatus = 'تایید شده' | 'در انتظار تایید' | 'رد شده' | 'باطل شده';
+export type MoadianStatus = 'تایید شده' | 'در انتظار تایید' | 'رد شده' | 'باطل شده' | 'عدم نیاز به واکنش';
 
 export interface MoadianInvoice {
   id: string;
   fiscal_year_id: string;
-  direction: 'SALES' | 'PURCHASE';
+  direction: 'SALES' | 'PURCHASE' | 'UNKNOWN';
   quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   tax_id: string;
   jalali_date: string;
@@ -150,14 +159,16 @@ export interface MoadianInvoice {
 export interface AgentApprovalRequest {
   id: string;
   fiscal_year_id: string;
-  voucher_id: string;
+  voucher_id: string | null;
   idempotency_key: string;
   agent_name: string;
   tool_name: string;
   status: 'PENDING_HUMAN_APPROVAL' | 'APPROVED' | 'REJECTED';
   created_at: string;
   rationale_fa: string;
-  evidence_type: 'BANK_STATEMENT' | 'MOADIAN_INVOICE' | 'PAYROLL_LIST' | 'FIXED_ASSET';
+  evidence_type: 'BANK_STATEMENT' | 'MOADIAN_INVOICE' | 'PAYROLL_LIST' | 'FIXED_ASSET' | 'OTHER';
+  action_type?: string;
+  payload?: Record<string, unknown>;
   evidence_ref: string;
   evidence_summary_fa: string;
   compliance_flags: string[];

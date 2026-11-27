@@ -59,6 +59,7 @@ export function VoucherWorkbenchView() {
     vouchers,
     currencyUnit,
     saveVoucherAtomic,
+    finalizeVoucher,
     deleteDraftVoucher,
   } = useFiscalYear();
 
@@ -67,6 +68,9 @@ export function VoucherWorkbenchView() {
   const [selectedVoucherId, setSelectedVoucherId] = useState<string | null>(vouchers[0]?.id ?? null);
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
   const [printVoucher, setPrintVoucher] = useState<Voucher | null>(null);
+  const [finalizeConfirmOpen, setFinalizeConfirmOpen] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeFeedback, setFinalizeFeedback] = useState<string | null>(null);
 
   // Editor state
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
@@ -78,6 +82,7 @@ export function VoucherWorkbenchView() {
   const [lines, setLines] = useState<EditableLine[]>([makeBlankLine(1), makeBlankLine(2)]);
   const [saveFeedback, setSaveFeedback] = useState<{ ok: boolean; messageFa: string } | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
+  const [pendingIdempotency, setPendingIdempotency] = useState<{ key: string; fingerprint: string } | null>(null);
 
   const selectedVoucher = useMemo(
     () => vouchers.find((v) => v.id === selectedVoucherId) ?? vouchers[0] ?? null,
@@ -113,6 +118,7 @@ export function VoucherWorkbenchView() {
     if (isReadOnly) return;
     setIsCreatingNew(true);
     setEditingId(undefined);
+    setPendingIdempotency(null);
     setJalaliDate(activeFiscalYear.code === '1404' ? '1404/11/25' : activeFiscalYear.jalali_start);
     setGregorianDate(activeFiscalYear.code === '1404' ? '2026-02-14' : activeFiscalYear.start_date);
     setReferenceNo('');
@@ -128,6 +134,7 @@ export function VoucherWorkbenchView() {
     if (isReadOnly || voucher.status !== 'DRAFT') return;
     setIsCreatingNew(true);
     setEditingId(voucher.id);
+    setPendingIdempotency(null);
     setJalaliDate(voucher.jalali_date);
     setGregorianDate(voucher.gregorian_date);
     setReferenceNo(voucher.reference_no ?? '');
@@ -179,17 +186,29 @@ export function VoucherWorkbenchView() {
       return;
     }
 
+    if (saving) return;
     setSaving(true);
     setSaveFeedback(null);
-    const res = await saveVoucherAtomic({
+    const payload = {
       id: editingId,
       jalali_date: jalaliDate,
       gregorian_date: gregorianDate,
       description_fa: descriptionFa.trim(),
       reference_no: referenceNo.trim() || undefined,
-      source: 'MANUAL',
+      source: 'MANUAL' as const,
       compliance_flags: complianceIssues.filter((i) => i.severity !== 'INFO').map((i) => i.code),
       lines: parsedLines.filter((l) => l.debit_rial > 0 || l.credit_rial > 0),
+    };
+    const fingerprint = JSON.stringify({ fiscalYearId: activeFiscalYear.id, ...payload });
+    const pending = !editingId && pendingIdempotency?.fingerprint === fingerprint
+      ? pendingIdempotency
+      : !editingId
+        ? { key: crypto.randomUUID(), fingerprint }
+        : null;
+    if (pending) setPendingIdempotency(pending);
+    const res = await saveVoucherAtomic({
+      ...payload,
+      ...(pending ? { idempotency_key: pending.key } : {}),
     });
     setSaving(false);
 
@@ -198,9 +217,10 @@ export function VoucherWorkbenchView() {
       return;
     }
 
+    setPendingIdempotency(null);
     setSaveFeedback({
       ok: true,
-      messageFa: `سند شماره ${toPersianDigits(res.voucher?.voucher_no ?? 0)} به‌صورت اتمیک (fn_create_voucher_atomic) در وضعیت پیشنویس ثبت شد.`,
+      messageFa: `سند شماره ${toPersianDigits(res.voucher?.voucher_no ?? 0)} به‌صورت اتمیک (fn_create_voucher_draft_atomic) در وضعیت پیشنویس ثبت شد.`,
     });
     if (res.voucher) {
       setSelectedVoucherId(res.voucher.id);
@@ -208,8 +228,22 @@ export function VoucherWorkbenchView() {
     }
   };
 
-  const handleDeleteDraft = (voucherId: string) => {
-    const res = deleteDraftVoucher(voucherId);
+  const handleFinalizeDraft = async () => {
+    if (!selectedVoucher || finalizing) return;
+    setFinalizing(true);
+    setFinalizeFeedback(null);
+    const result = await finalizeVoucher(selectedVoucher.id);
+    setFinalizing(false);
+    if (result.ok) {
+      setFinalizeConfirmOpen(false);
+      setSaveFeedback({ ok: true, messageFa: result.messageFa });
+    } else {
+      setFinalizeFeedback(result.messageFa);
+    }
+  };
+
+  const handleDeleteDraft = async (voucherId: string) => {
+    const res = await deleteDraftVoucher(voucherId);
     if (!res.ok) {
       setSaveFeedback({ ok: false, messageFa: res.errorFa ?? 'خطا در حذف سند' });
     } else {
@@ -227,7 +261,7 @@ export function VoucherWorkbenchView() {
         <div>
           <h1 className="text-2xl font-extrabold text-[#F8FAFC]">میز کار اسناد حسابداری و دفتر کل</h1>
           <p className="mt-1 text-xs text-[#94A3B8]">
-            ثبت اتمیک اسناد دوطرفه (<span className="mono-ltr">fn_create_voucher_atomic</span>) · کنترل زنده تراز و قوانین مالیاتی ایران (مواد ۱۴۷، ۸۶، ۵۳، ۱۰۴ منسوخ و ۱۴۹)
+            ثبت اتمیک اسناد دوطرفه (<span className="mono-ltr">fn_create_voucher_draft_atomic</span>) · کنترل زنده تراز و قوانین مالیاتی ایران (مواد ۱۴۷، ۸۶، ۵۳، ۱۰۴ منسوخ و ۱۴۹)
           </p>
         </div>
 
@@ -665,7 +699,7 @@ export function VoucherWorkbenchView() {
                   className="inline-flex items-center gap-2 rounded-lg bg-[#FF7A00] px-5 py-2.5 text-xs font-bold text-[#102333] transition-colors hover:bg-[#ff8c24] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Save className="h-4 w-4" />
-                  <span>{saving ? 'در حال ثبت اتمیک...' : 'ثبت اتمیک سند (fn_create_voucher_atomic)'}</span>
+                  <span>{saving ? 'در حال ثبت اتمیک...' : 'ثبت اتمیک سند (fn_create_voucher_draft_atomic)'}</span>
                 </button>
               </div>
             </div>
@@ -714,6 +748,20 @@ export function VoucherWorkbenchView() {
 
                   {selectedVoucher.status === 'DRAFT' && (
                     <>
+                      {selectedVoucher.source !== 'AI_AGENT' && (
+                        <button
+                          type="button"
+                          disabled={isReadOnly || finalizing}
+                          onClick={() => {
+                            setFinalizeFeedback(null);
+                            setFinalizeConfirmOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#10B981]/40 bg-[#10B981]/10 px-3.5 py-2 text-xs font-bold text-[#34D399] hover:bg-[#10B981]/20 disabled:opacity-40"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          قطعی‌سازی سند
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={isReadOnly}
@@ -825,6 +873,53 @@ export function VoucherWorkbenchView() {
           )}
         </section>
       </div>
+
+      {finalizeConfirmOpen && selectedVoucher && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="تأیید قطعی‌سازی سند حسابداری"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#102333] p-6 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-[#10B981]/15 p-2.5 text-[#34D399]">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-[#F8FAFC]">قطعی‌سازی سند حسابداری</h3>
+                <p className="mt-2 text-sm leading-7 text-[#CBD5E1]">
+                  پس از تأیید، شماره سند به‌صورت خودکار تخصیص داده می‌شود و ویرایش مستقیم سند مسدود خواهد شد.
+                  این عملیات در دفتر کل ثبت می‌شود.
+                </p>
+              </div>
+            </div>
+            {finalizeFeedback && (
+              <div className="mt-4 rounded-lg border border-[#ED2F42]/30 bg-[#ED2F42]/10 p-3 text-xs leading-6 text-[#FCA5A5]">
+                {finalizeFeedback}
+              </div>
+            )}
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={finalizing}
+                onClick={() => setFinalizeConfirmOpen(false)}
+                className="rounded-lg border border-white/15 px-4 py-2.5 text-xs font-semibold text-[#CBD5E1] hover:bg-white/5 disabled:opacity-40"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                disabled={isReadOnly || finalizing}
+                onClick={handleFinalizeDraft}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#10B981] px-4 py-2.5 text-xs font-extrabold text-[#06251B] hover:bg-[#34D399] disabled:opacity-40"
+              >
+                {finalizing ? 'در حال قطعی‌سازی...' : 'تأیید و قطعی‌سازی'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =================== PRINT OFFICIAL VOUCHER MODAL (ALWAYS EXACT RIALS) =================== */}
       {printVoucher && (

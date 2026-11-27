@@ -8,10 +8,6 @@ import {
   Database,
 } from 'lucide-react';
 import { useFiscalYear } from '../contexts/FiscalYearContext';
-import {
-  buildSampleWorkbookBuffer,
-  parseAccountingExcelBuffer,
-} from '../lib/excelParsers';
 import { formatCurrency, toPersianDigits, unitLabelFa } from '../lib/persian';
 import type { ExcelFormatType, ParsedExcelResult } from '../types/erp';
 
@@ -65,6 +61,7 @@ export function ExcelImporterView() {
     setParseError(null);
     setCommitResult(null);
     try {
+      const { parseAccountingExcelBuffer } = await import('../lib/excelParsers');
       const buffer = await file.arrayBuffer();
       const result = parseAccountingExcelBuffer(buffer, file.name);
       setParsed(result);
@@ -84,15 +81,21 @@ export function ExcelImporterView() {
     if (file) void handleFile(file);
   };
 
-  const runSampleDryRun = (format: ExcelFormatType) => {
+  const runSampleDryRun = async (format: ExcelFormatType) => {
     setParseError(null);
     setCommitResult(null);
-    const { buffer, fileName } = buildSampleWorkbookBuffer(format);
-    const result = parseAccountingExcelBuffer(buffer, fileName);
-    setParsed(result);
+    try {
+      const { buildSampleWorkbookBuffer, parseAccountingExcelBuffer } = await import('../lib/excelParsers');
+      const { buffer, fileName } = buildSampleWorkbookBuffer(format);
+      const result = parseAccountingExcelBuffer(buffer, fileName);
+      setParsed(result);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'خطا در تولید پیش‌نمایش نمونه اکسل');
+    }
   };
 
-  const downloadSampleWorkbook = (format: ExcelFormatType) => {
+  const downloadSampleWorkbook = async (format: ExcelFormatType) => {
+    const { buildSampleWorkbookBuffer } = await import('../lib/excelParsers');
     const { buffer, fileName } = buildSampleWorkbookBuffer(format);
     const blob = new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

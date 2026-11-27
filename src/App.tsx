@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { AuthProvider, getRoleLabel, useAuth } from './contexts/AuthContext';
 import { FiscalYearProvider } from './contexts/FiscalYearContext';
 import { LayoutShell } from './components/LayoutShell';
 import { LoginView } from './components/LoginView';
-import { DashboardView } from './components/DashboardView';
-import { VoucherWorkbenchView } from './components/VoucherWorkbenchView';
-import { ExcelImporterView } from './components/ExcelImporterView';
-import { AgentQueueView } from './components/AgentQueueView';
-import { YearEndClosingView } from './components/YearEndClosingView';
-import { StatementsAndMcpView } from './components/StatementsAndMcpView';
-import { MasterDataView } from './components/MasterDataView';
-import { AgentManagementCenter } from './components/AgentManagementCenter';
+const DashboardView = lazy(() => import('./components/DashboardView').then((m) => ({ default: m.DashboardView })));
+const VoucherWorkbenchView = lazy(() => import('./components/VoucherWorkbenchView').then((m) => ({ default: m.VoucherWorkbenchView })));
+const ExcelImporterView = lazy(() => import('./components/ExcelImporterView').then((m) => ({ default: m.ExcelImporterView })));
+const AgentQueueView = lazy(() => import('./components/AgentQueueView').then((m) => ({ default: m.AgentQueueView })));
+const YearEndClosingView = lazy(() => import('./components/YearEndClosingView').then((m) => ({ default: m.YearEndClosingView })));
+const StatementsAndMcpView = lazy(() => import('./components/StatementsAndMcpView').then((m) => ({ default: m.StatementsAndMcpView })));
+const MasterDataView = lazy(() => import('./components/MasterDataView').then((m) => ({ default: m.MasterDataView })));
+const AgentManagementCenter = lazy(() => import('./components/AgentManagementCenter').then((m) => ({ default: m.AgentManagementCenter })));
 import { getSupabaseCredentials } from './lib/supabase';
 import type { ActiveViewId } from './types/erp';
 
@@ -25,19 +25,32 @@ function LoadingScreen() {
   );
 }
 
+function ViewLoading() {
+  return (
+    <div role="status" aria-live="polite" className="flex min-h-[40vh] items-center justify-center">
+      <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-4 text-sm text-[#CBD5E1]">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#FF7A00]" />
+        <span>در حال بارگذاری بخش...</span>
+      </div>
+    </div>
+  );
+}
+
 function AuthenticatedWorkspace({ onSignOut }: { onSignOut: () => Promise<void> }) {
   const [activeView, setActiveView] = useState<ActiveViewId>('dashboard');
 
   return (
     <LayoutShell activeView={activeView} onSelectView={setActiveView} onSignOut={onSignOut}>
-      {activeView === 'dashboard' && <DashboardView onNavigate={setActiveView} />}
-      {activeView === 'vouchers' && <VoucherWorkbenchView />}
-      {activeView === 'excel_import' && <ExcelImporterView />}
-      {activeView === 'agent_queue' && <AgentQueueView />}
-      {activeView === 'year_end' && <YearEndClosingView onNavigate={setActiveView} />}
-      {activeView === 'statements' && <StatementsAndMcpView />}
-      {activeView === 'master_data' && <MasterDataView />}
-      {activeView === 'agent_center' && <AgentManagementCenter />}
+      <Suspense fallback={<ViewLoading />}>
+        {activeView === 'dashboard' && <DashboardView onNavigate={setActiveView} />}
+        {activeView === 'vouchers' && <VoucherWorkbenchView />}
+        {activeView === 'excel_import' && <ExcelImporterView />}
+        {activeView === 'agent_queue' && <AgentQueueView />}
+        {activeView === 'year_end' && <YearEndClosingView onNavigate={setActiveView} />}
+        {activeView === 'statements' && <StatementsAndMcpView />}
+        {activeView === 'master_data' && <MasterDataView />}
+        {activeView === 'agent_center' && <AgentManagementCenter />}
+      </Suspense>
     </LayoutShell>
   );
 }
