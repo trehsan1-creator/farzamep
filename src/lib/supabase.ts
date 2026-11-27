@@ -82,7 +82,7 @@ export function getSupabaseClient(): SupabaseClient | null {
 
 export interface AtomicVoucherPayload {
   p_fiscal_year_id: string;
-  p_voucher_type: 'GENERAL' | 'ADJUSTMENT' | 'OPENING' | 'CLOSING';
+  p_voucher_type: 'GENERAL' | 'ADJUSTMENT';
   p_voucher_date_gregorian: string;
   p_voucher_date_jalali: string;
   p_description: string;
