@@ -182,7 +182,7 @@ export function SalesWorkbenchView() {
         .select('id,tafsil_code,full_name,national_id,economic_code,iban,metadata,party_type,is_active')
         .eq('party_type', 'CUSTOMER').eq('is_active', true).order('full_name'),
       supabase.from('products')
-        .select('id,product_code,name_fa,unit_fa,is_vat_subject,sale_price_rial,standard_cost_rial,vat_rate_pct,track_inventory,is_active')
+        .select('id,product_code,name_fa,unit_fa,is_vat_subject,sale_price_rial,vat_rate_pct,track_inventory,is_active')
         .eq('is_active', true).order('name_fa'),
       supabase.from('inventory_warehouses').select('id,code,name_fa').eq('is_active', true).order('name_fa'),
       supabase.from('sales_settings').select('*').eq('id', true).single(),
@@ -540,7 +540,7 @@ export function SalesWorkbenchView() {
       warehouse_id: warehouses[0]?.id ?? '',
       quantity_delta: '',
       movement_type: 'OPENING',
-      unit_cost_rial: product.standard_cost_rial == null ? '' : String(product.standard_cost_rial),
+      unit_cost_rial: '', // Product master has no standard-cost column; opening-stock cost is entered explicitly.
       note: '',
     });
   };
